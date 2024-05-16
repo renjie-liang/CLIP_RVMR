@@ -1,2 +1,6 @@
 .git
 .idea
+*__pycache__
+ckpts
+data
+results

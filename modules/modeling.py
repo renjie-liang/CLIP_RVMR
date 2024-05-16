@@ -7,14 +7,14 @@ import logging
 import torch
 from torch import nn
 
-from modules.until_module import PreTrainedModel, AllGather, CrossEn
+from modules.until_module import PreTrainedModel, CrossEn
 from modules.module_cross import CrossModel, CrossConfig, Transformer as TransformerClip
 
 from modules.module_clip import CLIP, convert_weights
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 logger = logging.getLogger(__name__)
-allgather = AllGather.apply
+# allgather = AllGather.apply
 
 class CLIP4ClipPreTrainedModel(PreTrainedModel, nn.Module):
     """ An abstract class to handle weights initialization and
@@ -383,11 +383,11 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
             visual_output = visual_output.permute(1, 0, 2)  # LND -> NLD
             visual_output = visual_output + visual_output_original
 
-        if self.training:
-            visual_output = allgather(visual_output, self.task_config)
-            video_mask = allgather(video_mask, self.task_config)
-            sequence_output = allgather(sequence_output, self.task_config)
-            torch.distributed.barrier()
+        # if self.training:
+        #     visual_output = allgather(visual_output, self.task_config)
+        #     video_mask = allgather(video_mask, self.task_config)
+        #     sequence_output = allgather(sequence_output, self.task_config)
+        #     torch.distributed.barrier()
 
         visual_output = visual_output / visual_output.norm(dim=-1, keepdim=True)
         visual_output = self._mean_pooling_for_similarity_visual(visual_output, video_mask)

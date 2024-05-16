@@ -18,7 +18,7 @@ from modules.optimization import BertAdam
 from util import parallel_apply, get_logger
 from dataloaders.data_dataloaders import DATALOADER_DICT
 
-torch.distributed.init_process_group(backend="nccl")
+# torch.distributed.init_process_group(backend="nccl")
 
 global logger
 
@@ -103,6 +103,7 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
                         help="choice a similarity header.")
 
     parser.add_argument("--pretrained_clip_name", default="ViT-B/32", type=str, help="Choose a CLIP version")
+    parser.add_argument("--divice", default="gpu", type=str)
 
     args = parser.parse_args()
 
@@ -132,36 +133,37 @@ def set_seed_logger(args):
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-    world_size = torch.distributed.get_world_size()
-    torch.cuda.set_device(args.local_rank)
-    args.world_size = world_size
-    rank = torch.distributed.get_rank()
-    args.rank = rank
+    # world_size = torch.distributed.get_world_size()
+    # torch.cuda.set_device(args.local_rank)
+    # args.world_size = world_size
+    # rank = torch.distributed.get_rank()
+    # args.rank = rank
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
     logger = get_logger(os.path.join(args.output_dir, "log.txt"))
 
-    if args.local_rank == 0:
-        logger.info("Effective parameters:")
-        for key in sorted(args.__dict__):
-            logger.info("  <<< {}: {}".format(key, args.__dict__[key]))
+    # if args.local_rank == 0:
+    #     logger.info("Effective parameters:")
+    #     for key in sorted(args.__dict__):
+    #         logger.info("  <<< {}: {}".format(key, args.__dict__[key]))
 
     return args
 
 def init_device(args, local_rank):
     global logger
 
+    # device = args.device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu", local_rank)
-
     n_gpu = torch.cuda.device_count()
+    
     logger.info("device: {} n_gpu: {}".format(device, n_gpu))
-    args.n_gpu = n_gpu
+    # args.n_gpu = n_gpu
 
-    if args.batch_size % args.n_gpu != 0 or args.batch_size_val % args.n_gpu != 0:
-        raise ValueError("Invalid batch_size/batch_size_val and n_gpu parameter: {}%{} and {}%{}, should be == 0".format(
-            args.batch_size, args.n_gpu, args.batch_size_val, args.n_gpu))
+    # if args.batch_size % args.n_gpu != 0 or args.batch_size_val % args.n_gpu != 0:
+    #     raise ValueError("Invalid batch_size/batch_size_val and n_gpu parameter: {}%{} and {}%{}, should be == 0".format(
+    #         args.batch_size, args.n_gpu, args.batch_size_val, args.n_gpu))
 
     return device, n_gpu
 
@@ -211,9 +213,10 @@ def prep_optimizer(args, model, num_train_optimization_steps, device, n_gpu, loc
                          t_total=num_train_optimization_steps, weight_decay=weight_decay,
                          max_grad_norm=1.0)
 
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank],
-                                                      output_device=local_rank, find_unused_parameters=True)
-
+    # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank],
+                                                    #   output_device=local_rank, find_unused_parameters=True)
+                                                    
+    model.to(device)
     return optimizer, scheduler, model
 
 def save_model(epoch, args, model, optimizer, tr_loss, type_name=""):
@@ -391,40 +394,7 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
         # 2. calculate the similarity
         # ----------------------------------
         if n_gpu > 1:
-            device_ids = list(range(n_gpu))
-            batch_list_t_splits = []
-            batch_list_v_splits = []
-            batch_t_output_splits = []
-            batch_v_output_splits = []
-            bacth_len = len(batch_list_t)
-            split_len = (bacth_len + n_gpu - 1) // n_gpu
-            for dev_id in device_ids:
-                s_, e_ = dev_id * split_len, (dev_id + 1) * split_len
-                if dev_id == 0:
-                    batch_list_t_splits.append(batch_list_t[s_:e_])
-                    batch_list_v_splits.append(batch_list_v)
-
-                    batch_t_output_splits.append(batch_sequence_output_list[s_:e_])
-                    batch_v_output_splits.append(batch_visual_output_list)
-                else:
-                    devc = torch.device('cuda:{}'.format(str(dev_id)))
-                    devc_batch_list = [tuple(t.to(devc) for t in b) for b in batch_list_t[s_:e_]]
-                    batch_list_t_splits.append(devc_batch_list)
-                    devc_batch_list = [tuple(t.to(devc) for t in b) for b in batch_list_v]
-                    batch_list_v_splits.append(devc_batch_list)
-
-                    devc_batch_list = [b.to(devc) for b in batch_sequence_output_list[s_:e_]]
-                    batch_t_output_splits.append(devc_batch_list)
-                    devc_batch_list = [b.to(devc) for b in batch_visual_output_list]
-                    batch_v_output_splits.append(devc_batch_list)
-
-            parameters_tuple_list = [(batch_list_t_splits[dev_id], batch_list_v_splits[dev_id],
-                                      batch_t_output_splits[dev_id], batch_v_output_splits[dev_id]) for dev_id in device_ids]
-            parallel_outputs = parallel_apply(_run_on_single_gpu, model, parameters_tuple_list, device_ids)
-            sim_matrix = []
-            for idx in range(len(parallel_outputs)):
-                sim_matrix += parallel_outputs[idx]
-            sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
+            NotImplementedError
         else:
             sim_matrix = _run_on_single_gpu(model, batch_list_t, batch_list_v, batch_sequence_output_list, batch_visual_output_list)
             sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
@@ -524,7 +494,7 @@ def main():
     # train and eval
     ## ####################################
     if args.do_train:
-        train_dataloader, train_length, train_sampler = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
+        train_dataloader, train_length = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
         num_train_optimization_steps = (int(len(train_dataloader) + args.gradient_accumulation_steps - 1)
                                         / args.gradient_accumulation_steps) * args.epochs
 
@@ -551,13 +521,13 @@ def main():
         
         global_step = 0
         for epoch in range(resumed_epoch, args.epochs):
-            train_sampler.set_epoch(epoch)
-            tr_loss, global_step = train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer,
-                                               scheduler, global_step, local_rank=args.local_rank)
+            # train_sampler.set_epoch(epoch)
+            # tr_loss, global_step = train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer,
+            #                                    scheduler, global_step, local_rank=args.local_rank)
             if args.local_rank == 0:
-                logger.info("Epoch %d/%s Finished, Train Loss: %f", epoch + 1, args.epochs, tr_loss)
+                # logger.info("Epoch %d/%s Finished, Train Loss: %f", epoch + 1, args.epochs, tr_loss)
 
-                output_model_file = save_model(epoch, args, model, optimizer, tr_loss, type_name="")
+                # output_model_file = save_model(epoch, args, model, optimizer, tr_loss, type_name="")
 
                 ## Run on val dataset, this process is *TIME-consuming*.
                 # logger.info("Eval on val dataset")

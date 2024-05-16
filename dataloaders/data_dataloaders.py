@@ -7,6 +7,7 @@ from dataloaders.dataloader_lsmdc_retrieval import LSMDC_DataLoader
 from dataloaders.dataloader_activitynet_retrieval import ActivityNet_DataLoader
 from dataloaders.dataloader_didemo_retrieval import DiDeMo_DataLoader
 
+
 def dataloader_msrvtt_train(args, tokenizer):
     msrvtt_dataset = MSRVTT_TrainDataLoader(
         csv_path=args.train_csv,
@@ -21,18 +22,17 @@ def dataloader_msrvtt_train(args, tokenizer):
         slice_framepos=args.slice_framepos,
     )
 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(msrvtt_dataset)
     dataloader = DataLoader(
         msrvtt_dataset,
         batch_size=args.batch_size // args.n_gpu,
         num_workers=args.num_thread_reader,
         pin_memory=False,
-        shuffle=(train_sampler is None),
-        sampler=train_sampler,
+        shuffle=True,  # Always shuffle since there's no sampler
         drop_last=True,
     )
 
-    return dataloader, len(msrvtt_dataset), train_sampler
+    return dataloader, len(msrvtt_dataset)
+
 
 def dataloader_msrvtt_test(args, tokenizer, subset="test"):
     msrvtt_testset = MSRVTT_DataLoader(
