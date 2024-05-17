@@ -247,50 +247,33 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask, video, video_mask=None):
-        input_ids = input_ids.view(-1, input_ids.shape[-1])
-        attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
-        video_mask = video_mask.view(-1, video_mask.shape[-1])
+        sequence_output = self.get_sequence_output(input_ids, attention_mask)
+        visual_output = self.get_visual_output(video, video_mask)
 
-        # T x 3 x H x W
+        loss = 0.0
+        sim_matrix, *_tmp = self.get_similarity_logits(sequence_output, visual_output, attention_mask, video_mask,
+                                                shaped=True, loose_type=self.loose_type)
+        sim_loss1 = self.loss_fct(sim_matrix)
+        sim_loss2 = self.loss_fct(sim_matrix.T)
+        sim_loss = (sim_loss1 + sim_loss2) / 2
+        loss += sim_loss
+        return loss
+
+    def get_sequence_output(self, input_ids, attention_mask):
+        # input_ids = input_ids.view(-1, input_ids.shape[-1])
+        # attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
+        bs_pair = input_ids.size(0)
+        sequence_hidden = self.clip.encode_text(input_ids).float()
+        sequence_hidden = sequence_hidden.view(bs_pair, -1, sequence_hidden.size(-1))
+        return sequence_hidden
+
+    def get_visual_output(self, video, video_mask):
+        
+        video_mask = video_mask.view(-1, video_mask.shape[-1])
         video = torch.as_tensor(video).float()
         b, pair, bs, ts, channel, h, w = video.shape
         video = video.view(b * pair * bs * ts, channel, h, w)
         video_frame = bs * ts
-
-        sequence_output, visual_output = self.get_sequence_visual_output(input_ids, attention_mask,
-                                                                         video, video_mask, shaped=True, video_frame=video_frame)
-
-        if self.training:
-            loss = 0.
-            sim_matrix, *_tmp = self.get_similarity_logits(sequence_output, visual_output, attention_mask, video_mask,
-                                                    shaped=True, loose_type=self.loose_type)
-            sim_loss1 = self.loss_fct(sim_matrix)
-            sim_loss2 = self.loss_fct(sim_matrix.T)
-            sim_loss = (sim_loss1 + sim_loss2) / 2
-            loss += sim_loss
-
-            return loss
-        else:
-            return None
-
-    def get_sequence_output(self, input_ids, attention_mask, shaped=False):
-        if shaped is False:
-            input_ids = input_ids.view(-1, input_ids.shape[-1])
-            attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
-
-        bs_pair = input_ids.size(0)
-        sequence_hidden = self.clip.encode_text(input_ids).float()
-        sequence_hidden = sequence_hidden.view(bs_pair, -1, sequence_hidden.size(-1))
-
-        return sequence_hidden
-
-    def get_visual_output(self, video, video_mask, shaped=False, video_frame=-1):
-        if shaped is False:
-            video_mask = video_mask.view(-1, video_mask.shape[-1])
-            video = torch.as_tensor(video).float()
-            b, pair, bs, ts, channel, h, w = video.shape
-            video = video.view(b * pair * bs * ts, channel, h, w)
-            video_frame = bs * ts
 
         bs_pair = video_mask.size(0)
         visual_hidden = self.clip.encode_image(video, video_frame=video_frame).float()
@@ -298,21 +281,6 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
 
         return visual_hidden
 
-    def get_sequence_visual_output(self, input_ids, attention_mask, video, video_mask, shaped=False, video_frame=-1):
-        if shaped is False:
-            input_ids = input_ids.view(-1, input_ids.shape[-1])
-            attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
-            video_mask = video_mask.view(-1, video_mask.shape[-1])
-
-            video = torch.as_tensor(video).float()
-            b, pair, bs, ts, channel, h, w = video.shape
-            video = video.view(b * pair * bs * ts, channel, h, w)
-            video_frame = bs * ts
-
-        sequence_output = self.get_sequence_output(input_ids, attention_mask, shaped=True)
-        visual_output = self.get_visual_output(video, video_mask, shaped=True, video_frame=video_frame)
-
-        return sequence_output, visual_output
 
     def _get_cross_output(self, sequence_output, visual_output, attention_mask, video_mask):
 

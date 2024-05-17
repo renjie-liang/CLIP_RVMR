@@ -1,11 +1,12 @@
 python main_task_retrieval.py --do_train --num_thread_reader=0 \
 --train_path /home/renjie.liang/datasets/TVR_Ranking/train_top01.jsonl \
---val_path /home/renjie.liang/datasets/TVR_Ranking/val.jsonl \
---test_path /home/renjie.liang/datasets/TVR_Ranking/test.jsonl \
+--val_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/val.jsonl \
+--test_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/test.jsonl \
 --video_path /home/share/rjliang/Dataset/TVR/frames \
 --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/video_corpus.json \
 --output_dir ckpts/tvrr_tmp \
---epochs=5 --batch_size=4 --n_display=50 \
+--epochs=5 --batch_size=24 \
+--n_display=200 --eval_step=2000 \
 --lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 5 \
 --datatype msrvtt --expand_msrvtt_sentences  \
 --feature_framerate 1 --coef_lr 1e-3 \

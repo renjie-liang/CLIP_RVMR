@@ -1,8 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
-
 import torch
 import numpy as np
 import random
@@ -14,10 +9,9 @@ from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from modules.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modules.modeling import CLIP4Clip
 from modules.optimization import BertAdam
-
 from util import parallel_apply, get_logger
-from dataloaders.data_dataloaders import dataloader_TVRR_train, dataloader_TVRR_video_corpus
-
+from dataloaders.data_dataloaders import dataloader_TVRR_train, dataloader_TVRR_eval, dataloader_TVRR_video_corpus
+from evaluate_video_retrieval import eval_epoch
 # torch.distributed.init_process_group(backend="nccl")
 
 global logger
@@ -112,6 +106,7 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--test_path", type=str)
     parser.add_argument("--video_path", type=str)
     parser.add_argument("--corpus_path", type=str)
+    parser.add_argument("--eval_step", type=int)
     
 
     args = parser.parse_args()
@@ -249,181 +244,8 @@ def load_model(epoch, args, n_gpu, device, model_file=None):
         model = None
     return model
 
-def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, scheduler, global_step, local_rank=0):
-    global logger
-    torch.cuda.empty_cache()
-    model.train()
-    log_step = args.n_display
-    start_time = time.time()
-    total_loss = 0
 
-    for step, batch in enumerate(train_dataloader):
-        if n_gpu == 1:
-            # multi-gpu does scattering it-self
-            batch = tuple(t.to(device=device, non_blocking=True) for t in batch)
 
-        batch = [b.to(device) for b in batch]
-        text_ids, text_masks, videos, video_masks = batch
-        loss = model(text_ids, text_masks, videos, video_masks)
-
-        if n_gpu > 1:
-            loss = loss.mean()  # mean() to average on multi-gpu.
-        if args.gradient_accumulation_steps > 1:
-            loss = loss / args.gradient_accumulation_steps
-
-        loss.backward()
-
-        total_loss += float(loss)
-        if (step + 1) % args.gradient_accumulation_steps == 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            if scheduler is not None:
-                scheduler.step()  # Update learning rate schedule
-
-            optimizer.step()
-            optimizer.zero_grad()
-
-            # https://github.com/openai/CLIP/issues/46
-            if hasattr(model, 'module'):
-                torch.clamp_(model.module.clip.logit_scale.data, max=np.log(100))
-            else:
-                torch.clamp_(model.clip.logit_scale.data, max=np.log(100))
-
-            global_step += 1
-            if global_step % log_step == 0 and local_rank == 0:
-                logger.info("Epoch: %d/%s, Step: %d/%d, Lr: %s, Loss: %f, Time/step: %f", epoch + 1,
-                            args.epochs, step + 1,
-                            len(train_dataloader), "-".join([str('%.9f'%itm) for itm in sorted(list(set(optimizer.get_lr())))]),
-                            float(loss),
-                            (time.time() - start_time) / (log_step * args.gradient_accumulation_steps))
-                start_time = time.time()
-
-    total_loss = total_loss / len(train_dataloader)
-    return total_loss, global_step
-
-def _run_on_single_gpu(model, batch_list_t, batch_list_v, batch_sequence_output_list, batch_visual_output_list):
-    sim_matrix = []
-    for idx1, b1 in enumerate(batch_list_t):
-        input_mask, segment_ids, *_tmp = b1
-        sequence_output = batch_sequence_output_list[idx1]
-        each_row = []
-        for idx2, b2 in enumerate(batch_list_v):
-            video_mask, *_tmp = b2
-            visual_output = batch_visual_output_list[idx2]
-            b1b2_logits, *_tmp = model.get_similarity_logits(sequence_output, visual_output, input_mask, video_mask,
-                                                                     loose_type=model.loose_type)
-            b1b2_logits = b1b2_logits.cpu().detach().numpy()
-            each_row.append(b1b2_logits)
-        each_row = np.concatenate(tuple(each_row), axis=-1)
-        sim_matrix.append(each_row)
-    return sim_matrix
-
-def eval_epoch(args, model, test_dataloader, device, n_gpu):
-
-    if hasattr(model, 'module'):
-        model = model.module.to(device)
-    else:
-        model = model.to(device)
-
-    # #################################################################
-    ## below variables are used to multi-sentences retrieval
-    # multi_sentence_: important tag for eval
-    # cut_off_points: used to tag the label when calculate the metric
-    # sentence_num: used to cut the sentence representation
-    # video_num: used to cut the video representation
-    # #################################################################
-    multi_sentence_ = False
-    cut_off_points_, sentence_num_, video_num_ = [], -1, -1
-    if hasattr(test_dataloader.dataset, 'multi_sentence_per_video') \
-            and test_dataloader.dataset.multi_sentence_per_video:
-        multi_sentence_ = True
-        cut_off_points_ = test_dataloader.dataset.cut_off_points
-        sentence_num_ = test_dataloader.dataset.sentence_num
-        video_num_ = test_dataloader.dataset.video_num
-        cut_off_points_ = [itm - 1 for itm in cut_off_points_]
-
-    if multi_sentence_:
-        logger.warning("Eval under the multi-sentence per video clip setting.")
-        logger.warning("sentence num: {}, video num: {}".format(sentence_num_, video_num_))
-
-    model.eval()
-    with torch.no_grad():
-        batch_list_t = []
-        batch_list_v = []
-        batch_sequence_output_list, batch_visual_output_list = [], []
-        total_video_num = 0
-
-        # ----------------------------
-        # 1. cache the features
-        # ----------------------------
-        for bid, batch in enumerate(test_dataloader):
-            batch = tuple(t.to(device) for t in batch)
-            input_ids, input_mask, segment_ids, video, video_mask = batch
-
-            if multi_sentence_:
-                # multi-sentences retrieval means: one clip has two or more descriptions.
-                b, *_t = video.shape
-                sequence_output = model.get_sequence_output(input_ids, segment_ids, input_mask)
-                batch_sequence_output_list.append(sequence_output)
-                batch_list_t.append((input_mask, segment_ids,))
-
-                s_, e_ = total_video_num, total_video_num + b
-                filter_inds = [itm - s_ for itm in cut_off_points_ if itm >= s_ and itm < e_]
-
-                if len(filter_inds) > 0:
-                    video, video_mask = video[filter_inds, ...], video_mask[filter_inds, ...]
-                    visual_output = model.get_visual_output(video, video_mask)
-                    batch_visual_output_list.append(visual_output)
-                    batch_list_v.append((video_mask,))
-                total_video_num += b
-            else:
-                sequence_output, visual_output = model.get_sequence_visual_output(input_ids, segment_ids, input_mask, video, video_mask)
-
-                batch_sequence_output_list.append(sequence_output)
-                batch_list_t.append((input_mask, segment_ids,))
-
-                batch_visual_output_list.append(visual_output)
-                batch_list_v.append((video_mask,))
-
-            print("{}/{}\r".format(bid, len(test_dataloader)), end="")
-
-        # ----------------------------------
-        # 2. calculate the similarity
-        # ----------------------------------
-        if n_gpu > 1:
-            NotImplementedError
-        else:
-            sim_matrix = _run_on_single_gpu(model, batch_list_t, batch_list_v, batch_sequence_output_list, batch_visual_output_list)
-            sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
-
-    if multi_sentence_:
-        logger.info("before reshape, sim matrix size: {} x {}".format(sim_matrix.shape[0], sim_matrix.shape[1]))
-        cut_off_points2len_ = [itm + 1 for itm in cut_off_points_]
-        max_length = max([e_-s_ for s_, e_ in zip([0]+cut_off_points2len_[:-1], cut_off_points2len_)])
-        sim_matrix_new = []
-        for s_, e_ in zip([0] + cut_off_points2len_[:-1], cut_off_points2len_):
-            sim_matrix_new.append(np.concatenate((sim_matrix[s_:e_],
-                                                  np.full((max_length-e_+s_, sim_matrix.shape[1]), -np.inf)), axis=0))
-        sim_matrix = np.stack(tuple(sim_matrix_new), axis=0)
-        logger.info("after reshape, sim matrix size: {} x {} x {}".
-                    format(sim_matrix.shape[0], sim_matrix.shape[1], sim_matrix.shape[2]))
-
-        tv_metrics = tensor_text_to_video_metrics(sim_matrix)
-        vt_metrics = compute_metrics(tensor_video_to_text_sim(sim_matrix))
-    else:
-        logger.info("sim matrix size: {}, {}".format(sim_matrix.shape[0], sim_matrix.shape[1]))
-        tv_metrics = compute_metrics(sim_matrix)
-        vt_metrics = compute_metrics(sim_matrix.T)
-        logger.info('\t Length-T: {}, Length-V:{}'.format(len(sim_matrix), len(sim_matrix[0])))
-
-    logger.info("Text-to-Video:")
-    logger.info('\t>>>  R@1: {:.1f} - R@5: {:.1f} - R@10: {:.1f} - Median R: {:.1f} - Mean R: {:.1f}'.
-                format(tv_metrics['R1'], tv_metrics['R5'], tv_metrics['R10'], tv_metrics['MR'], tv_metrics['MeanR']))
-    logger.info("Video-to-Text:")
-    logger.info('\t>>>  V2T$R@1: {:.1f} - V2T$R@5: {:.1f} - V2T$R@10: {:.1f} - V2T$Median R: {:.1f} - V2T$Mean R: {:.1f}'.
-                format(vt_metrics['R1'], vt_metrics['R5'], vt_metrics['R10'], vt_metrics['MR'], vt_metrics['MeanR']))
-
-    R1 = tv_metrics['R1']
-    return R1
 
 def main():
     global logger
@@ -457,77 +279,69 @@ def main():
                 # paramenters which < freeze_layer_num will be freezed
                 param.requires_grad = False
 
-    ## ####################################
-    # dataloader loading
-    ## ####################################
-    # assert args.datatype in DATALOADER_DICT
-
-    # assert DATALOADER_DICT[args.datatype]["test"] is not None \
-    #        or DATALOADER_DICT[args.datatype]["val"] is not None
-
-    # test_dataloader, test_length = None, 0
-    # if DATALOADER_DICT[args.datatype]["test"] is not None:
-    #     test_dataloader, test_length = DATALOADER_DICT[args.datatype]["test"](args, tokenizer)
-
-    # if DATALOADER_DICT[args.datatype]["val"] is not None:
-    #     val_dataloader, val_length = DATALOADER_DICT[args.datatype]["val"](args, tokenizer, subset="val")
-    # else:
-    #     val_dataloader, val_length = test_dataloader, test_length
-
-    train_dataloader, train_length = dataloader_TVRR_train(args.train_path, args, tokenizer)
-    corpus_dataloader, corpus_length = dataloader_TVRR_video_corpus(args.corpus_path, args, tokenizer)
-    # test_dataloader, test_length = dataloader_TVRR_eval(args, tokenizer)
-    # val_dataloader, val_length = dataloader_TVRR_eval(args, tokenizer, subset="val")
+    train_dataloader, train_dataset = dataloader_TVRR_train(args.train_path, args, tokenizer)
+    val_dataloader, val_dataset = dataloader_TVRR_eval(args.val_path, args, tokenizer)
+    test_dataloader, test_dataset = dataloader_TVRR_eval(args.test_path, args, tokenizer)
+    corpus_dataloader = dataloader_TVRR_video_corpus(args.corpus_path, args)
 
     ## ####################################
     # train and eval
     ## ####################################
-    if args.do_train:
-        num_train_optimization_steps = (int(len(train_dataloader) + args.gradient_accumulation_steps - 1)
-                                        / args.gradient_accumulation_steps) * args.epochs
+    num_train_optimization_steps = (int(len(train_dataloader) + args.gradient_accumulation_steps - 1)
+                                    / args.gradient_accumulation_steps) * args.epochs
 
-        coef_lr = args.coef_lr
-        optimizer, scheduler, model = prep_optimizer(args, model, num_train_optimization_steps, device, n_gpu, args.local_rank, coef_lr=coef_lr)
+    coef_lr = args.coef_lr
+    optimizer, scheduler, model = prep_optimizer(args, model, num_train_optimization_steps, device, n_gpu, args.local_rank, coef_lr=coef_lr)
 
-        best_score = 0.00001
-        best_output_model_file = "None"
-        ## ##############################################################
-        # resume optimizer state besides loss to continue train
-        ## ##############################################################
-        resumed_epoch = 0
-        if args.resume_model:
-            checkpoint = torch.load(args.resume_model, map_location='cpu')
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            resumed_epoch = checkpoint['epoch']+1
-            resumed_loss = checkpoint['loss']
+    best_score = 0.00001
+    best_output_model_file = "None"
+    ## ##############################################################
+    # resume optimizer state besides loss to continue train
+    ## ##############################################################
+    resumed_epoch = 0
+    if args.resume_model:
+        checkpoint = torch.load(args.resume_model, map_location='cpu')
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        resumed_epoch = checkpoint['epoch']+1
+        resumed_loss = checkpoint['loss']
+    
+    global_step = 0
+    for epoch in range(resumed_epoch, args.epochs):
         
-        global_step = 0
-        for epoch in range(resumed_epoch, args.epochs):
-            tr_loss, global_step = train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer,
-                                               scheduler, global_step, local_rank=args.local_rank)
-            if args.local_rank == 0:
+        #++++++++++++++++++++++++++++++++++++
+        
+        torch.cuda.empty_cache()
+        model.train()
+        log_step = args.n_display
+        for step, batch in enumerate(train_dataloader):
+            batch = [b.to(device) for b in batch]
+            text_ids, text_masks, videos, video_masks = batch
+            loss = model(text_ids, text_masks, videos, video_masks)
+
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            if scheduler is not None:
+                scheduler.step() 
+            optimizer.step()
+            optimizer.zero_grad()
+
+
+            global_step += 1
+            if global_step % log_step == 0:
+                logger.info("Epoch: %d/%s, Step: %d/%d, Lr: %s, Loss: %f", epoch + 1,
+                            args.epochs, step + 1,
+                            len(train_dataloader), "-".join([str('%.9f'%itm) for itm in sorted(list(set(optimizer.get_lr())))]),
+                            float(loss))
+    #++++++++++++++++++++++++++++++++
+        
+            if global_step % args.eval_step == 0:
                 # logger.info("Epoch %d/%s Finished, Train Loss: %f", epoch + 1, args.epochs, tr_loss)
+                val_r100 = eval_epoch(args, model, val_dataloader, corpus_dataloader, device, val_dataset.ground_truth)
+                logger.info(f"VAL Recall@100: {val_r100}")
+                test_r100 = eval_epoch(args, model, test_dataloader, corpus_dataloader, device, test_dataset.ground_truth)
+                logger.info(f"TEST Recall@100: {test_r100}")
 
-                # output_model_file = save_model(epoch, args, model, optimizer, tr_loss, type_name="")
-
-                ## Run on val dataset, this process is *TIME-consuming*.
-                # logger.info("Eval on val dataset")
-                # R1 = eval_epoch(args, model, val_dataloader, device, n_gpu)
-
-                R1 = eval_epoch(args, model, test_dataloader, device, n_gpu)
-                if best_score <= R1:
-                    best_score = R1
-                    best_output_model_file = output_model_file
-                logger.info("The best model is: {}, the R1 is: {:.4f}".format(best_output_model_file, best_score))
-
-        ## Uncomment if want to test on the best checkpoint
-        # if args.local_rank == 0:
-        #     model = load_model(-1, args, n_gpu, device, model_file=best_output_model_file)
-        #     eval_epoch(args, model, test_dataloader, device, n_gpu)
-
-    elif args.do_eval:
-        if args.local_rank == 0:
-            eval_epoch(args, model, test_dataloader, device, n_gpu)
 
 if __name__ == "__main__":
     main()

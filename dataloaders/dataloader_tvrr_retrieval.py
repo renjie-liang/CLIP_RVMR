@@ -8,12 +8,10 @@ from utils.utils import load_jsonl, load_json
 import torch
 import cv2
 
-    
-
 class TVRR_Base_DataLoader(Dataset):
     def __init__(self):
-        pass
-    
+        self.SPECIAL_TOKEN = {"CLS_TOKEN": "<|startoftext|>", "SEP_TOKEN": "<|endoftext|>",
+                              "MASK_TOKEN": "[MASK]", "UNK_TOKEN": "[UNK]", "PAD_TOKEN": "[PAD]"}
     def _prepare_text(self, sentence):
         # Tokenize the sentence and add special tokens
         words = [self.SPECIAL_TOKEN["CLS_TOKEN"]] + self.tokenizer.tokenize(sentence) + [self.SPECIAL_TOKEN["SEP_TOKEN"]]
@@ -80,39 +78,31 @@ class TVRR_Base_DataLoader(Dataset):
         # Generate video_mask: 1 for real frames, 0 for padding
         video_mask = [1] * min(total_frames, self.max_frames) + [0] * (self.max_frames - min(total_frames, self.max_frames))
         video_mask = torch.tensor(video_mask, dtype=torch.long)
-        video_mask = torch.unsqueeze(video_mask, axis=0)  # [1 x self.max_frames]
+        # video_mask = torch.unsqueeze(video_mask, axis=0)  # [1 x self.max_frames]
         
         assert frames.shape == (1, self.max_frames, 1, 3, 224, 224)
-        assert video_mask.shape == (1, self.max_frames)
+        assert len(video_mask) == self.max_frames
         
         return frames, video_mask
 
 
 
 
-class TVRR_DataLoader(TVRR_Base_DataLoader):
-    def __init__(self, annotation_path, video_path, tokenizer, dataset_type,
+class TVRR_DataLoader_train(TVRR_Base_DataLoader):
+    def __init__(self, annotation_path, video_path, tokenizer,
                 max_words=30, feature_framerate=1.0, max_frames=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
+        super().__init__()
+        
         self.annotation = load_jsonl(annotation_path)
         self.video_path = video_path
-        self.dataset_type = dataset_type
         
-        # self.feature_framerate = feature_framerate
         self.max_words = max_words
         self.max_frames = max_frames
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
-        # 0: ordinary order; 1: reverse order; 2: random order.
-        # self.frame_order = frame_order
-        # assert self.frame_order in [0, 1, 2]
-        # 0: cut from head frames; 1: cut from tail frames; 2: extract frames uniformly.
-        # self.slice_framepos = slice_framepos
-        # assert self.slice_framepos in [0, 1, 2]
 
-        self.SPECIAL_TOKEN = {"CLS_TOKEN": "<|startoftext|>", "SEP_TOKEN": "<|endoftext|>",
-                              "MASK_TOKEN": "[MASK]", "UNK_TOKEN": "[UNK]", "PAD_TOKEN": "[PAD]"}
     def __len__(self):
         return len(self.annotation)
 
@@ -121,12 +111,51 @@ class TVRR_DataLoader(TVRR_Base_DataLoader):
         text = anno["query"]
         video_id = anno["video_name"]
         simi = anno["similarity"]
-
         text_id, text_mask = self._prepare_text(text)
         video, video_mask = self._prepare_video(video_id)
         return text_id, text_mask, video, video_mask
 
+        
+        
+class TVRR_DataLoader_eval(TVRR_Base_DataLoader):
+    def __init__(self, annotation_path, corpus_path, video_path, tokenizer,
+                max_words=30, feature_framerate=1.0, max_frames=100,
+                image_resolution=224, frame_order=0, slice_framepos=0,
+    ):
+        super().__init__()
+        self.annotation = load_jsonl(annotation_path)
+        self.video_path = video_path
+        self.max_words = max_words
+        self.max_frames = max_frames
+        self.image_resolution = image_resolution
+        self.tokenizer = tokenizer
+        
+        self.corpus_map = load_json(corpus_path)
+        self.corpus = list(self.corpus_map.keys())
+        self.ground_truth = self.generate_gt()
+        
+    def __len__(self):
+        return len(self.annotation)
 
+    def __getitem__(self, idx):
+        anno = self.annotation[idx]
+        text = anno["query"]
+        text_id, text_mask = self._prepare_text(text)
+        return text_id, text_mask
+        
+    def generate_gt(self):
+        all_gt = []
+        for record in self.annotation:
+            one_text_gt = []
+            for i in record["relevant_moment"]:
+                video_name = i["video_name"]
+                try:
+                    vidx = self.corpus.index(video_name)
+                    one_text_gt.append(vidx)
+                except ValueError:
+                    print(f"Warning: {video_name} not found in corpus")
+            all_gt.append(one_text_gt)
+        return all_gt
 
 
 
@@ -142,10 +171,10 @@ class TVRR_Corpus_DataLoader(TVRR_Base_DataLoader):
         self.image_resolution = image_resolution
         
     def __len__(self):
-        return len(self.annotation)
+        return len(self.corpus)
 
     def __getitem__(self, idx):
-        video_id = self.corpus["video_name"]
+        video_id = self.corpus[idx]
         video, video_mask = self._prepare_video(video_id)
         return video, video_mask
     
