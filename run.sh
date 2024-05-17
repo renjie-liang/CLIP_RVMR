@@ -1,11 +1,12 @@
 python main_task_retrieval.py --do_train --num_thread_reader=0 \
---epochs=5 --batch_size=16 --n_display=50 \
---train_csv /home/renjie.liang/datasets/MSRVTT/msrvtt_data/MSRVTT_train.9k.csv \
---val_csv /home/renjie.liang/datasets/MSRVTT/msrvtt_data/MSRVTT_JSFUSION_test.csv \
---data_path /home/renjie.liang/datasets/MSRVTT/msrvtt_data/MSRVTT_data.json \
---features_path /home/renjie.liang/datasets/MSRVTT/MSRVTT/videos/all \
---output_dir ckpts/ckpt_msrvtt_retrieval_looseType \
---lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 16 \
+--train_path /home/renjie.liang/datasets/TVR_Ranking/train_top01.jsonl \
+--val_path /home/renjie.liang/datasets/TVR_Ranking/val.jsonl \
+--test_path /home/renjie.liang/datasets/TVR_Ranking/test.jsonl \
+--video_path /home/share/rjliang/Dataset/TVR/frames \
+--corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/video_corpus.json \
+--output_dir ckpts/tvrr_tmp \
+--epochs=5 --batch_size=4 --n_display=50 \
+--lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 5 \
 --datatype msrvtt --expand_msrvtt_sentences  \
 --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0  --slice_framepos 2 \

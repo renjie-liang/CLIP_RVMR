@@ -15,3 +15,6 @@ input_mask (2, 1, 32),
 video (2, 1, 12, 1, 3, 224, 224)
 video_mask (2, 1, 12)
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+
+
+max_frames = 12, it's better to use the segmentation

@@ -246,9 +246,8 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids, attention_mask, video, video_mask=None):
+    def forward(self, input_ids, attention_mask, video, video_mask=None):
         input_ids = input_ids.view(-1, input_ids.shape[-1])
-        token_type_ids = token_type_ids.view(-1, token_type_ids.shape[-1])
         attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
         video_mask = video_mask.view(-1, video_mask.shape[-1])
 
@@ -258,7 +257,7 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         video = video.view(b * pair * bs * ts, channel, h, w)
         video_frame = bs * ts
 
-        sequence_output, visual_output = self.get_sequence_visual_output(input_ids, token_type_ids, attention_mask,
+        sequence_output, visual_output = self.get_sequence_visual_output(input_ids, attention_mask,
                                                                          video, video_mask, shaped=True, video_frame=video_frame)
 
         if self.training:
@@ -274,10 +273,9 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         else:
             return None
 
-    def get_sequence_output(self, input_ids, token_type_ids, attention_mask, shaped=False):
+    def get_sequence_output(self, input_ids, attention_mask, shaped=False):
         if shaped is False:
             input_ids = input_ids.view(-1, input_ids.shape[-1])
-            token_type_ids = token_type_ids.view(-1, token_type_ids.shape[-1])
             attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
 
         bs_pair = input_ids.size(0)
@@ -300,10 +298,9 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
 
         return visual_hidden
 
-    def get_sequence_visual_output(self, input_ids, token_type_ids, attention_mask, video, video_mask, shaped=False, video_frame=-1):
+    def get_sequence_visual_output(self, input_ids, attention_mask, video, video_mask, shaped=False, video_frame=-1):
         if shaped is False:
             input_ids = input_ids.view(-1, input_ids.shape[-1])
-            token_type_ids = token_type_ids.view(-1, token_type_ids.shape[-1])
             attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
             video_mask = video_mask.view(-1, video_mask.shape[-1])
 
@@ -312,7 +309,7 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
             video = video.view(b * pair * bs * ts, channel, h, w)
             video_frame = bs * ts
 
-        sequence_output = self.get_sequence_output(input_ids, token_type_ids, attention_mask, shaped=True)
+        sequence_output = self.get_sequence_output(input_ids, attention_mask, shaped=True)
         visual_output = self.get_visual_output(video, video_mask, shaped=True, video_frame=video_frame)
 
         return sequence_output, visual_output

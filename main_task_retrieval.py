@@ -16,7 +16,7 @@ from modules.modeling import CLIP4Clip
 from modules.optimization import BertAdam
 
 from util import parallel_apply, get_logger
-from dataloaders.data_dataloaders import DATALOADER_DICT
+from dataloaders.data_dataloaders import dataloader_TVRR_train, dataloader_TVRR_video_corpus
 
 # torch.distributed.init_process_group(backend="nccl")
 
@@ -103,7 +103,16 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
                         help="choice a similarity header.")
 
     parser.add_argument("--pretrained_clip_name", default="ViT-B/32", type=str, help="Choose a CLIP version")
-    parser.add_argument("--divice", default="gpu", type=str)
+    
+    
+    # -----------------
+    # parser.add_argument("--divice", default="gpu", type=str)
+    parser.add_argument("--train_path", type=str)
+    parser.add_argument("--val_path", type=str)
+    parser.add_argument("--test_path", type=str)
+    parser.add_argument("--video_path", type=str)
+    parser.add_argument("--corpus_path", type=str)
+    
 
     args = parser.parse_args()
 
@@ -151,35 +160,23 @@ def set_seed_logger(args):
 
     return args
 
-def init_device(args, local_rank):
+def init_device():
     global logger
-
-    # device = args.device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu", local_rank)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
-    
     logger.info("device: {} n_gpu: {}".format(device, n_gpu))
-    # args.n_gpu = n_gpu
-
-    # if args.batch_size % args.n_gpu != 0 or args.batch_size_val % args.n_gpu != 0:
-    #     raise ValueError("Invalid batch_size/batch_size_val and n_gpu parameter: {}%{} and {}%{}, should be == 0".format(
-    #         args.batch_size, args.n_gpu, args.batch_size_val, args.n_gpu))
-
     return device, n_gpu
 
-def init_model(args, device, n_gpu, local_rank):
+def init_model(args, device, n_gpu):
 
     if args.init_model:
         model_state_dict = torch.load(args.init_model, map_location='cpu')
     else:
         model_state_dict = None
-
     # Prepare model
     cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
     model = CLIP4Clip.from_pretrained(args.cross_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
-
     model.to(device)
-
     return model
 
 def prep_optimizer(args, model, num_train_optimization_steps, device, n_gpu, local_rank, coef_lr=1.):
@@ -265,8 +262,9 @@ def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, 
             # multi-gpu does scattering it-self
             batch = tuple(t.to(device=device, non_blocking=True) for t in batch)
 
-        input_ids, input_mask, segment_ids, video, video_mask = batch
-        loss = model(input_ids, segment_ids, input_mask, video, video_mask)
+        batch = [b.to(device) for b in batch]
+        text_ids, text_masks, videos, video_masks = batch
+        loss = model(text_ids, text_masks, videos, video_masks)
 
         if n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu.
@@ -277,9 +275,7 @@ def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, 
 
         total_loss += float(loss)
         if (step + 1) % args.gradient_accumulation_steps == 0:
-
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
             if scheduler is not None:
                 scheduler.step()  # Update learning rate schedule
 
@@ -433,12 +429,12 @@ def main():
     global logger
     args = get_args()
     args = set_seed_logger(args)
-    device, n_gpu = init_device(args, args.local_rank)
+    device, n_gpu = init_device()
 
     tokenizer = ClipTokenizer()
 
     assert  args.task_type == "retrieval"
-    model = init_model(args, device, n_gpu, args.local_rank)
+    model = init_model(args, device, n_gpu)
 
     ## ####################################
     # freeze testing
@@ -464,48 +460,34 @@ def main():
     ## ####################################
     # dataloader loading
     ## ####################################
-    assert args.datatype in DATALOADER_DICT
+    # assert args.datatype in DATALOADER_DICT
 
-    assert DATALOADER_DICT[args.datatype]["test"] is not None \
-           or DATALOADER_DICT[args.datatype]["val"] is not None
+    # assert DATALOADER_DICT[args.datatype]["test"] is not None \
+    #        or DATALOADER_DICT[args.datatype]["val"] is not None
 
-    test_dataloader, test_length = None, 0
-    if DATALOADER_DICT[args.datatype]["test"] is not None:
-        test_dataloader, test_length = DATALOADER_DICT[args.datatype]["test"](args, tokenizer)
+    # test_dataloader, test_length = None, 0
+    # if DATALOADER_DICT[args.datatype]["test"] is not None:
+    #     test_dataloader, test_length = DATALOADER_DICT[args.datatype]["test"](args, tokenizer)
 
-    if DATALOADER_DICT[args.datatype]["val"] is not None:
-        val_dataloader, val_length = DATALOADER_DICT[args.datatype]["val"](args, tokenizer, subset="val")
-    else:
-        val_dataloader, val_length = test_dataloader, test_length
+    # if DATALOADER_DICT[args.datatype]["val"] is not None:
+    #     val_dataloader, val_length = DATALOADER_DICT[args.datatype]["val"](args, tokenizer, subset="val")
+    # else:
+    #     val_dataloader, val_length = test_dataloader, test_length
 
-    ## report validation results if the ["test"] is None
-    if test_dataloader is None:
-        test_dataloader, test_length = val_dataloader, val_length
-
-    if args.local_rank == 0:
-        logger.info("***** Running test *****")
-        logger.info("  Num examples = %d", test_length)
-        logger.info("  Batch size = %d", args.batch_size_val)
-        logger.info("  Num steps = %d", len(test_dataloader))
-        logger.info("***** Running val *****")
-        logger.info("  Num examples = %d", val_length)
+    train_dataloader, train_length = dataloader_TVRR_train(args.train_path, args, tokenizer)
+    corpus_dataloader, corpus_length = dataloader_TVRR_video_corpus(args.corpus_path, args, tokenizer)
+    # test_dataloader, test_length = dataloader_TVRR_eval(args, tokenizer)
+    # val_dataloader, val_length = dataloader_TVRR_eval(args, tokenizer, subset="val")
 
     ## ####################################
     # train and eval
     ## ####################################
     if args.do_train:
-        train_dataloader, train_length = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
         num_train_optimization_steps = (int(len(train_dataloader) + args.gradient_accumulation_steps - 1)
                                         / args.gradient_accumulation_steps) * args.epochs
 
         coef_lr = args.coef_lr
         optimizer, scheduler, model = prep_optimizer(args, model, num_train_optimization_steps, device, n_gpu, args.local_rank, coef_lr=coef_lr)
-
-        if args.local_rank == 0:
-            logger.info("***** Running training *****")
-            logger.info("  Num examples = %d", train_length)
-            logger.info("  Batch size = %d", args.batch_size)
-            logger.info("  Num steps = %d", num_train_optimization_steps * args.gradient_accumulation_steps)
 
         best_score = 0.00001
         best_output_model_file = "None"
@@ -521,9 +503,8 @@ def main():
         
         global_step = 0
         for epoch in range(resumed_epoch, args.epochs):
-            # train_sampler.set_epoch(epoch)
-            # tr_loss, global_step = train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer,
-            #                                    scheduler, global_step, local_rank=args.local_rank)
+            tr_loss, global_step = train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer,
+                                               scheduler, global_step, local_rank=args.local_rank)
             if args.local_rank == 0:
                 # logger.info("Epoch %d/%s Finished, Train Loss: %f", epoch + 1, args.epochs, tr_loss)
 
