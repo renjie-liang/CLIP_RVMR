@@ -20,8 +20,8 @@
                 "--output_dir", "ckpts/debug",
                 "--max_words", "32", "--max_frames", "12",
 
-                "--do_train", "--num_thread_reader=0", "--epochs=5", 
-                "--batch_size=4", "--batch_size_val", "16", "--n_display=50",
+                "--do_train", "--num_workers=0", "--epochs=5", 
+                "--batch_size=4", "--batch_size_val", "16", "--step_log=50",
                 "--lr", "1e-4",
 
                 "--datatype", "msrvtt",

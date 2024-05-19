@@ -3,7 +3,6 @@ import torch
 from tqdm import tqdm
 
 def eval_epoch(args, model, eval_dataloader, corpus_dataloader, device, ground_truth):
-
     # ----------------------------
     # 1. cache the features
     # ----------------------------

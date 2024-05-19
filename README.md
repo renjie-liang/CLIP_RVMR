@@ -96,8 +96,8 @@ Then, run
 ```sh
 DATA_PATH=[Your MSRVTT data and videos path]
 python -m torch.distributed.launch --nproc_per_node=4 \
-main_task_retrieval.py --do_train --num_thread_reader=0 \
---epochs=5 --batch_size=128 --n_display=50 \
+main_task_retrieval.py --do_train --num_workers=0 \
+--epochs=5 --batch_size=128 --step_log=50 \
 --train_csv ${DATA_PATH}/MSRVTT_train.9k.csv \
 --val_csv ${DATA_PATH}/MSRVTT_JSFUSION_test.csv \
 --data_path ${DATA_PATH}/MSRVTT_data.json \
@@ -115,8 +115,8 @@ main_task_retrieval.py --do_train --num_thread_reader=0 \
 ```sh
 DATA_PATH=[Your MSVD data and videos path]
 python -m torch.distributed.launch --nproc_per_node=4 \
-main_task_retrieval.py --do_train --num_thread_reader=2 \
---epochs=5 --batch_size=128 --n_display=50 \
+main_task_retrieval.py --do_train --num_workers=2 \
+--epochs=5 --batch_size=128 --step_log=50 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/MSVD_Videos \
 --output_dir ckpts/ckpt_msvd_retrieval_looseType \
@@ -132,8 +132,8 @@ main_task_retrieval.py --do_train --num_thread_reader=2 \
 ```sh
 DATA_PATH=[Your LSMDC data and videos path]
 python -m torch.distributed.launch --nproc_per_node=4 \
-main_task_retrieval.py --do_train --num_thread_reader=2 \
---epochs=5 --batch_size=128 --n_display=50 \
+main_task_retrieval.py --do_train --num_workers=2 \
+--epochs=5 --batch_size=128 --step_log=50 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/LSMDC_Videos \
 --output_dir ckpts/ckpt_lsmdc_retrieval_looseType \
@@ -149,8 +149,8 @@ ActivityNet is regarded as video-paragraph retrieval in our setting, thus, need 
 ```sh
 DATA_PATH=[Your ActivityNet data and videos path]
 python -m torch.distributed.launch --nproc_per_node=8 \
-main_task_retrieval.py --do_train --num_thread_reader=2 \
---epochs=5 --batch_size=128 --n_display=50 \
+main_task_retrieval.py --do_train --num_workers=2 \
+--epochs=5 --batch_size=128 --step_log=50 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/Activity_Videos \
 --output_dir ckpts/ckpt_activity_retrieval_looseType \
@@ -166,8 +166,8 @@ DiDeMo is regarded as video-paragraph retrieval in our setting, thus, need more 
 ```sh
 DATA_PATH=[Your DiDeMo data and videos path]
 python -m torch.distributed.launch --nproc_per_node=8 \
-main_task_retrieval.py --do_train --num_thread_reader=2 \
---epochs=5 --batch_size=128 --n_display=50 \
+main_task_retrieval.py --do_train --num_workers=2 \
+--epochs=5 --batch_size=128 --step_log=50 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/DiDeMo_Videos \
 --output_dir ckpts/ckpt_didemo_retrieval_looseType \

@@ -14,7 +14,9 @@ def resize_and_save_images(input_dir, output_dir, size=(224, 224)):
         # Iterate over all files in the subdirectory
         for file_name in os.listdir(subdir_path):
             file_path = os.path.join(subdir_path, file_name)
-            
+            output_file_path = os.path.join(output_subdir_path, file_name)
+            if os.path.exists(output_file_path):
+                continue
             # Read the image
             image = cv2.imread(file_path)
             
@@ -22,7 +24,6 @@ def resize_and_save_images(input_dir, output_dir, size=(224, 224)):
             resized_image = cv2.resize(image, size)
             
             # Save the resized image to the output directory
-            output_file_path = os.path.join(output_subdir_path, file_name)
             cv2.imwrite(output_file_path, resized_image)
 
 # Specify the input and output directories

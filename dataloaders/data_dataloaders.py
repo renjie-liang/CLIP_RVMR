@@ -14,8 +14,8 @@ def dataloader_TVRR_video_corpus(corpus_path, args):
     )
     dataloader = DataLoader(
         tvrr_dataset,
-        batch_size=args.batch_size // args.n_gpu,
-        num_workers=args.num_thread_reader,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
         pin_memory=False,
         shuffle=False,
     )
@@ -32,8 +32,8 @@ def dataloader_TVRR_train(annotation_path, args, tokenizer):
     )
     dataloader = DataLoader(
         tvrr_dataset,
-        batch_size=args.batch_size // args.n_gpu,
-        num_workers=args.num_thread_reader,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
         pin_memory=False,
         shuffle=True,
     )
@@ -50,8 +50,8 @@ def dataloader_TVRR_eval(annotation_path, args, tokenizer):
     )
     dataloader = DataLoader(
         tvrr_dataset,
-        batch_size=args.batch_size // args.n_gpu,
-        num_workers=args.num_thread_reader,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
         pin_memory=False,
         shuffle=False,
     )
