@@ -17,4 +17,4 @@ python main_video_retrieval.py \
     --pretrained_clip_name ViT-B/16
 
 # qsub -I -l select=1:ngpus=1 -P gs_slab -q gpu8
-# cd /home/renjie.liang/12_RVMR_IR/CLIP4Clip ; conda activate py11 ; sh run.sh
+# cd /home/renjie.liang/12_RVMR_IR/CLIP4Clip ; conda activate py11 ; sh run_top01.sh

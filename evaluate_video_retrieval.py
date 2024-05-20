@@ -4,6 +4,7 @@ from tqdm import tqdm
 def grab_corpus_feature(model, corpus_dataloader, device):
     all_video_features, all_video_masks = [], []
     model.eval()
+    n = 0
     with torch.no_grad():
         # Process video features
         for batch in tqdm(corpus_dataloader, desc="Grab Videos Feature"):
@@ -16,6 +17,10 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             
             all_video_features.append(visual_output)
             all_video_masks.append(video_masks)
+            
+            # n += 1
+            # if n > 10:
+            #     break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
         all_video_masks = torch.cat(all_video_masks, dim=0)
@@ -45,7 +50,12 @@ def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth):
     R100 = calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, 100, logit_scale, ground_truth)
     return R100
 
-def mean_pooling_for_similarity_visual(visual_output, video_mask,):
+
+import torch
+import numpy as np
+from tqdm import tqdm
+
+def mean_pooling_for_similarity_visual(visual_output, video_mask):
     video_mask_un = video_mask.to(dtype=torch.float).unsqueeze(-1)
     visual_output = visual_output * video_mask_un
     video_mask_un_sum = torch.sum(video_mask_un, dim=1, dtype=torch.float)
@@ -53,27 +63,29 @@ def mean_pooling_for_similarity_visual(visual_output, video_mask,):
     video_out = torch.sum(visual_output, dim=1) / video_mask_un_sum
     return video_out
 
-def calculate_simi(text_output, video_output, video_mask,  logit_scale):
-    text_output, video_output = text_output.contiguous(), video_output.contiguous()
+def calculate_simi_batch(text_output, video_output, video_mask, logit_scale):
+    text_output = text_output.contiguous()
+    video_output = video_output.contiguous()
     video_output = video_output / video_output.norm(dim=-1, keepdim=True)
     video_output = mean_pooling_for_similarity_visual(video_output, video_mask)
     video_output = video_output / video_output.norm(dim=-1, keepdim=True)
-    text_output = text_output.squeeze(1)
     text_output = text_output / text_output.norm(dim=-1, keepdim=True)
     retrieve_logits = logit_scale * torch.matmul(text_output, video_output.t())
     return retrieve_logits
 
 def calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, topn, logit_scale, ground_truth):
+    all_text_features = all_text_features.squeeze(1)
+    all_text_features = all_text_features.contiguous()
+    all_video_features = all_video_features.contiguous()
+    # Calculate similarities in a batch
+    simi_matrix = calculate_simi_batch(all_text_features, all_video_features, all_video_masks, logit_scale)
+    simi_matrix = simi_matrix.cpu().detach().numpy()
     recalls = []
-    
-    for text_idx, text_features in tqdm(enumerate(all_text_features), total=len(all_text_features), desc="Calculate the Recall"):
-        simi = calculate_simi(text_features.unsqueeze(0), all_video_features, all_video_masks, logit_scale)
-        simi = simi.cpu().detach().numpy().flatten()
-        
+    for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
+        simi = simi_matrix[text_idx]
         gt_videos = ground_truth[text_idx]
         # Get top N similar video indices
         top_n_indices = np.argsort(-simi)[:topn]
-        
         # Calculate recall
         recall = sum(1 for gt in gt_videos if gt in top_n_indices) / len(gt_videos)
         recalls.append(recall)

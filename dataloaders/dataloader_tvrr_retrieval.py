@@ -7,7 +7,6 @@ import math
 from utils.utils import load_jsonl, load_json
 import torch
 import cv2
-import time
 
 class TVRR_Base_DataLoader(Dataset):
     def __init__(self):
@@ -42,8 +41,6 @@ class TVRR_Base_DataLoader(Dataset):
     
     def _get_frames(self, frame_path, n, HW):
         # Get a list of all frame files
-        start_time = time.time()
-        
         frame_files = sorted([f for f in os.listdir(frame_path)])
         
         # Select frames with the same step
@@ -54,17 +51,9 @@ class TVRR_Base_DataLoader(Dataset):
         # Load frames and resize to 224x224
         frames = []
         for frame_file in selected_frames:
-        
-            
             frame = cv2.imread(os.path.join(frame_path, frame_file))
-            self.time_read_frame += time.time() - start_time
-            start_time = time.time()
-            
             if not (frame.shape[1] == HW and frame.shape[2] == HW):
                 frame = cv2.resize(frame, (HW, HW))
-            self.time_resize_frame += time.time() - start_time
-            start_time = time.time()
-            
             frames.append(frame)
         return frames
        
@@ -119,8 +108,6 @@ class TVRR_DataLoader_train(TVRR_Base_DataLoader):
         self.max_frames = max_frames
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
-        self.time_read_frame = 0
-        self.time_resize_frame = 0
         
         
     def __len__(self):
@@ -134,9 +121,6 @@ class TVRR_DataLoader_train(TVRR_Base_DataLoader):
         # simi = anno["similarity"]
         text_id, text_mask = self._prepare_text(text)
         video, video_mask = self._prepare_video(video_id)
-        
-        print(f"self.time_read_frame: {self.time_read_frame:.4f}")
-        print(f"self.time_resize_frame: {self.time_resize_frame:.4f}")
         return text_id, text_mask, video, video_mask
 
         

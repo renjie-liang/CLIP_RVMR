@@ -112,8 +112,8 @@ def main():
                 print(f"time_forward: {time_forward:.4f}")
                 print(f"time_backward: {time_backward:.4f}")
             
-            if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
-            # if step % 1 == 0 or step % len(train_dataloader) == 0:
+            # if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
+            if step % 1 == 0 or step % len(train_dataloader) == 0:
                 corpus_feature = grab_corpus_feature(model, corpus_dataloader, device)
                 val_r100 = eval_epoch(model, val_dataloader, corpus_feature, device, val_dataset.ground_truth)
                 logger.info(f"\nVAL Recall@100: {val_r100:.4f}\n")
