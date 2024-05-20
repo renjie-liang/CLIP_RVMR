@@ -1,26 +1,41 @@
 import torch
+import torch.nn as nn
+
 from tqdm import tqdm
 
-from utils.utils_model import init_model, prep_optimizer
-from utils.setup import get_args, set_seed_logger, init_device
+from utils.utils_model import prep_optimizer, save_model, load_model
+from utils.setup import get_args, set_seed_logger
 
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from dataloaders.data_dataloaders import dataloader_TVRR_train, dataloader_TVRR_eval, dataloader_TVRR_video_corpus
-from evaluate_video_retrieval import eval_epoch
-
+from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
+from modules.modeling import CLIP4Clip
+import time
 
 def main():
     global logger
     args = get_args()
-    args, logger = set_seed_logger(args)
-    device = init_device(logger)
-    tokenizer = ClipTokenizer()
-    model = init_model(args, device)
-    logger.info("---------------------------------")
+    logger = set_seed_logger(args)
     logger.info(vars(args))
-    logger.info("---------------------------------")
+    
+    tokenizer = ClipTokenizer()
+    if args.checkpoint_path is not None:
+        logger.info(f"Load model from {args.checkpoint_path}")
+        model = load_model(args, args.checkpoint_path)
+            # checkpoint = torch.load(args.resume_model, map_location='cpu')
+    else:
+        model = CLIP4Clip.from_pretrained(task_config=args)
     
     
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        model = nn.DataParallel(model)
+        model.to(device)
+    else:
+        device = torch.device("cpu")
+        model.to(device)
+            
+
     ## ####################################
     # freeze testing
     ## ####################################
@@ -47,61 +62,69 @@ def main():
     test_dataloader, test_dataset = dataloader_TVRR_eval(args.test_path, args, tokenizer)
     corpus_dataloader = dataloader_TVRR_video_corpus(args.corpus_path, args)
 
+    num_train_optimization_steps = len(train_dataloader) * args.epochs
+    optimizer = prep_optimizer(args, model, num_train_optimization_steps, logger, coef_lr=args.coef_lr)
+
+        
+    best_score = -1.0
+    time_grab_data = 0
+    time_to_divice = 0
+    time_forward = 0
+    time_backward = 0
+    start_time = time.time()
+    
+    
     ## ####################################
     # train and eval
     ## ####################################
-    num_train_optimization_steps = len(train_dataloader) * args.epochs
-    coef_lr = args.coef_lr
-    optimizer, scheduler, model = prep_optimizer(args, model, num_train_optimization_steps, device, coef_lr=coef_lr)
-
-    best_score = 0.00001
-    best_output_model_file = "None"
-    ## ##############################################################
-    # resume optimizer state besides loss to continue train
-    ## ##############################################################
-    resumed_epoch = 0
-    if args.resume_model:
-        checkpoint = torch.load(args.resume_model, map_location='cpu')
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        resumed_epoch = checkpoint['epoch']+1
-        resumed_loss = checkpoint['loss']
-    
-    global_step = 0
-    for epoch in range(resumed_epoch, args.epochs):
-        
+    for epoch in range(args.epochs):
         # torch.cuda.empty_cache()
         model.train()
-        log_step = args.step_log
-        for step, batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
-            batch = [b.to(device) for b in batch]
-            text_ids, text_masks, videos, video_masks = batch
+        for step, batch_data in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
+            step += 1
+            optimizer.zero_grad()
+            
+            time_grab_data += time.time()  - start_time
+            start_time = time.time()
+            
+            batch_data = [b.to(device) for b in batch_data]
+            text_ids, text_masks, videos, video_masks = batch_data
+            
+            time_to_divice += time.time()  - start_time
+            start_time = time.time()
             loss = model(text_ids, text_masks, videos, video_masks)
+            time_forward += time.time()  - start_time
+            start_time = time.time()
+            
+            if loss.dim() > 0:  # Check if loss is not a scalar
+                loss = loss.mean()  # Apply reduction to make it a scalar
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            if scheduler is not None:
-                scheduler.step() 
             optimizer.step()
-            optimizer.zero_grad()
 
-            for i in range(torch.cuda.device_count()):
-                print(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**2:.2f} MB")
-                print(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**2:.2f} MB")
+            time_backward += time.time()  - start_time
+            start_time = time.time()
 
-            global_step += 1
-            if global_step % log_step == 0:
-                logger.info("Epoch: %d/%s, Step: %d/%d, Lr: %s, Loss: %f", epoch + 1,
-                            args.epochs, step + 1,
-                            len(train_dataloader), "-".join([str('%.9f'%itm) for itm in sorted(list(set(optimizer.get_lr())))]),
-                            float(loss))
-    #++++++++++++++++++++++++++++++++
-        
-            if global_step % args.step_eval == 0:
-                # logger.info("Epoch %d/%s Finished, Train Loss: %f", epoch + 1, args.epochs, tr_loss)
-                val_r100 = eval_epoch(args, model, val_dataloader, corpus_dataloader, device, val_dataset.ground_truth)
-                logger.info(f"VAL Recall@100: {val_r100}")
-                test_r100 = eval_epoch(args, model, test_dataloader, corpus_dataloader, device, test_dataset.ground_truth)
-                logger.info(f"TEST Recall@100: {test_r100}")
+            if step % args.step_log == 0 or step % len(train_dataloader) == 0:
+                logger.info(f"Epoch: {epoch}/{args.epochs}, Step: {step}/{len(train_dataloader)}, Loss: {loss.item():.6f}")
+                print(f"time_grab_data: {time_grab_data:.4f}")
+                print(f"time_to_divice: {time_to_divice:.4f}")
+                print(f"time_forward: {time_forward:.4f}")
+                print(f"time_backward: {time_backward:.4f}")
+            
+            if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
+            # if step % 1 == 0 or step % len(train_dataloader) == 0:
+                corpus_feature = grab_corpus_feature(model, corpus_dataloader, device)
+                val_r100 = eval_epoch(model, val_dataloader, corpus_feature, device, val_dataset.ground_truth)
+                logger.info(f"\nVAL Recall@100: {val_r100:.4f}\n")
+                test_r100 = eval_epoch(model, test_dataloader, corpus_feature, device, test_dataset.ground_truth)
+                logger.info(f"\nTEST Recall@100: {test_r100:.4f}\n")
 
+                if val_r100 > best_score:
+                    best_score = val_r100
+                    save_model(args, model, optimizer, suffix="best", logger=logger)
+                    logger.info(f"BEST VAL Recall@100: {val_r100:.4f}")
+                    logger.info(f"BEST TEST Recall@100: {test_r100:.4f}")
 
 if __name__ == "__main__":
     main()

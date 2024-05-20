@@ -7,6 +7,7 @@ import math
 from utils.utils import load_jsonl, load_json
 import torch
 import cv2
+import time
 
 class TVRR_Base_DataLoader(Dataset):
     def __init__(self):
@@ -36,10 +37,13 @@ class TVRR_Base_DataLoader(Dataset):
         input_ids = torch.tensor(input_ids, dtype=torch.long)
         input_mask = torch.tensor(input_mask, dtype=torch.long)
         
+
         return input_ids, input_mask
     
     def _get_frames(self, frame_path, n, HW):
         # Get a list of all frame files
+        start_time = time.time()
+        
         frame_files = sorted([f for f in os.listdir(frame_path)])
         
         # Select frames with the same step
@@ -50,16 +54,27 @@ class TVRR_Base_DataLoader(Dataset):
         # Load frames and resize to 224x224
         frames = []
         for frame_file in selected_frames:
+        
+            
             frame = cv2.imread(os.path.join(frame_path, frame_file))
+            self.time_read_frame += time.time() - start_time
+            start_time = time.time()
+            
             if not (frame.shape[1] == HW and frame.shape[2] == HW):
                 frame = cv2.resize(frame, (HW, HW))
+            self.time_resize_frame += time.time() - start_time
+            start_time = time.time()
+            
             frames.append(frame)
         return frames
        
     def _prepare_video(self, video_id):
+        
         frame_path = os.path.join(self.video_path, video_id)
         image_size = self.image_resolution
         frames =  self._get_frames(frame_path, self.max_frames, image_size)
+        
+
         
         total_frames = len(frames)
         # Pad if there are fewer frames than self.max_frames
@@ -83,6 +98,8 @@ class TVRR_Base_DataLoader(Dataset):
         assert frames.shape == (1, self.max_frames, 1, 3, 224, 224)
         assert len(video_mask) == self.max_frames
         
+        
+        
         return frames, video_mask
 
 
@@ -102,17 +119,24 @@ class TVRR_DataLoader_train(TVRR_Base_DataLoader):
         self.max_frames = max_frames
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
-
+        self.time_read_frame = 0
+        self.time_resize_frame = 0
+        
+        
     def __len__(self):
         return len(self.annotation)
 
     def __getitem__(self, idx):
+        
         anno = self.annotation[idx]
         text = anno["query"]
         video_id = anno["video_name"]
-        simi = anno["similarity"]
+        # simi = anno["similarity"]
         text_id, text_mask = self._prepare_text(text)
         video, video_mask = self._prepare_video(video_id)
+        
+        print(f"self.time_read_frame: {self.time_read_frame:.4f}")
+        print(f"self.time_resize_frame: {self.time_resize_frame:.4f}")
         return text_id, text_mask, video, video_mask
 
         
@@ -149,11 +173,14 @@ class TVRR_DataLoader_eval(TVRR_Base_DataLoader):
             one_text_gt = []
             for i in record["relevant_moment"]:
                 video_name = i["video_name"]
-                try:
-                    vidx = self.corpus.index(video_name)
+                relevance = i["relevance"]
+                vidx = self.corpus.index(video_name)
+                if relevance >= 1:
                     one_text_gt.append(vidx)
-                except ValueError:
-                    print(f"Warning: {video_name} not found in corpus")
+            if len(one_text_gt) == 0:
+                video_name = record["relevant_moment"][0]["video_name"]
+                vidx = self.corpus.index(video_name)
+                one_text_gt.append(vidx)
             all_gt.append(one_text_gt)
         return all_gt
 
@@ -177,4 +204,6 @@ class TVRR_Corpus_DataLoader(TVRR_Base_DataLoader):
         video_id = self.corpus[idx]
         video, video_mask = self._prepare_video(video_id)
         return video, video_mask
-    
+
+
+

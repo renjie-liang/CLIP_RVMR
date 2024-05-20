@@ -16,7 +16,6 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--batch_size_val', type=int, default=3500, help='batch size eval')
     parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate exp epoch decay')
-    parser.add_argument('--step_log', type=int, default=100, help='Information display frequence')
     parser.add_argument('--video_dim', type=int, default=1024, help='video feature dimension')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--max_words', type=int, default=20, help='')
@@ -31,7 +30,6 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
                         help="The output directory where the model predictions and checkpoints will be written.")
     parser.add_argument("--cross_model", default="cross-base", type=str, required=False, help="Cross module")
     parser.add_argument("--init_model", default=None, type=str, required=False, help="Initial model.")
-    parser.add_argument("--resume_model", default=None, type=str, required=False, help="Resume train model.")
     parser.add_argument("--do_lower_case", action='store_true', help="Set this flag if you are using an uncased model.")
     parser.add_argument("--warmup_proportion", default=0.1, type=float,
                         help="Proportion of training to perform linear learning rate warmup for. E.g., 0.1 = 10%% of training.")
@@ -86,7 +84,10 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--video_path", type=str)
     parser.add_argument("--corpus_path", type=str)
     parser.add_argument("--step_eval", type=int)
+    parser.add_argument('--step_log', type=int, default=100, help='Information display frequence')
     parser.add_argument("--experiment_remark", type=str)
+    parser.add_argument("--checkpoint_path", type=str)
+    parser.add_argument("--optimizer_path", type=str)
     
     args = parser.parse_args()
 
@@ -109,12 +110,12 @@ def set_seed_logger(args):
 
     os.makedirs(args.output_dir, exist_ok=True)
     logger = get_logger(args.output_dir, args.experiment_remark)
-    return args, logger
+    return logger
 
 
-def init_device(logger):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n = torch.cuda.device_count()
-    logger.info(f"Using {n} {device}!")
-    return device
+# def init_device(logger):
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     n = torch.cuda.device_count()
+#     logger.info(f"Using {n} {device}!")
+#     return device
 

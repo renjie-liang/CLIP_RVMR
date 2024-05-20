@@ -27,21 +27,13 @@ class CLIP4ClipPreTrainedModel(PreTrainedModel, nn.Module):
         self.cross = None
 
     @classmethod
-    def from_pretrained(cls, cross_model_name, state_dict=None, cache_dir=None, type_vocab_size=2, *inputs, **kwargs):
+    def from_pretrained(cls, task_config, state_dict=None, cache_dir=None, type_vocab_size=2, *inputs, **kwargs):
 
-        task_config = None
-        if "task_config" in kwargs.keys():
-            task_config = kwargs["task_config"]
-            if not hasattr(task_config, "local_rank"):
-                task_config.__dict__["local_rank"] = 0
-            elif task_config.local_rank == -1:
-                task_config.local_rank = 0
-
-        if state_dict is None: state_dict = {}
-        pretrained_clip_name = "ViT-B/32"
-        if hasattr(task_config, 'pretrained_clip_name'):
-            pretrained_clip_name = task_config.pretrained_clip_name
+        cross_model_name=task_config.cross_model
+        pretrained_clip_name = task_config.pretrained_clip_name
         clip_state_dict = CLIP.get_config(pretrained_clip_name=pretrained_clip_name)
+        
+        if state_dict is None: state_dict = {}
         for key, val in clip_state_dict.items():
             new_key = "clip." + key
             if new_key not in state_dict:
@@ -49,7 +41,7 @@ class CLIP4ClipPreTrainedModel(PreTrainedModel, nn.Module):
 
         cross_config, _ = CrossConfig.get_config(cross_model_name, cache_dir, type_vocab_size, state_dict=None, task_config=task_config)
 
-        model = cls(cross_config, clip_state_dict, *inputs, **kwargs)
+        model = cls(cross_config, clip_state_dict, task_config=task_config, *inputs, **kwargs)
 
         ## ===> Initialization trick [HARD CODE]
         if model.linear_patch == "3d":
@@ -200,7 +192,7 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         self.linear_patch = '2d'
         if hasattr(task_config, "linear_patch"):
             self.linear_patch = task_config.linear_patch
-            show_log(task_config, "\t\t linear_patch: {}".format(self.linear_patch))
+            show_log(task_config, "\t linear_patch: {}".format(self.linear_patch))
 
         # use .float() to avoid overflow/underflow from fp16 weight. https://github.com/openai/CLIP/issues/40
         cut_top_layer = 0

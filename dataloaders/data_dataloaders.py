@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import DataLoader
 from dataloaders.dataloader_tvrr_retrieval import TVRR_DataLoader_train, TVRR_DataLoader_eval, TVRR_Corpus_DataLoader
 
-
 def dataloader_TVRR_video_corpus(corpus_path, args):
     tvrr_dataset = TVRR_Corpus_DataLoader(
         corpus_path = corpus_path,
@@ -56,6 +55,5 @@ def dataloader_TVRR_eval(annotation_path, args, tokenizer):
         shuffle=False,
     )
     return dataloader, tvrr_dataset
-
 
 

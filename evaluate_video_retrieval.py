@@ -1,22 +1,15 @@
 import numpy as np
 import torch
 from tqdm import tqdm
-
-def eval_epoch(args, model, eval_dataloader, corpus_dataloader, device, ground_truth):
-    # ----------------------------
-    # 1. cache the features
-    # ----------------------------
+def grab_corpus_feature(model, corpus_dataloader, device):
     all_video_features, all_video_masks = [], []
-    all_text_features, all_text_masks = [], []
-    
     model.eval()
     with torch.no_grad():
         # Process video features
-        for batch in tqdm(corpus_dataloader, desc="Get Videos Feature"):
+        for batch in tqdm(corpus_dataloader, desc="Grab Videos Feature"):
             batch = [b.to(device) for b in batch]
             videos, video_masks = batch
-            visual_output = model.get_visual_output(videos, video_masks)
-            
+            visual_output = model.module.get_visual_output(videos, video_masks)
             # Detach and move to CPU
             visual_output = visual_output.detach().cpu()
             video_masks = video_masks.detach().cpu()
@@ -26,29 +19,30 @@ def eval_epoch(args, model, eval_dataloader, corpus_dataloader, device, ground_t
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
         all_video_masks = torch.cat(all_video_masks, dim=0)
+    return all_video_features, all_video_masks
 
+def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth):
+    all_video_features, all_video_masks = corpus_feature
+    all_text_features, all_text_masks = [], []
+    with torch.no_grad():
         # Process text features
         for batch in tqdm(eval_dataloader, desc="Get Texts Feature"):
             batch = [b.to(device) for b in batch]
             input_ids, input_mask = batch
-            text_output = model.get_sequence_output(input_ids, input_mask)
-            
+            text_output = model.module.get_sequence_output(input_ids, input_mask)
             # Detach and move to CPU
             text_output = text_output.detach().cpu()
             input_mask = input_mask.detach().cpu()
-            
             all_text_features.append(text_output)
             all_text_masks.append(input_mask)
         # Concatenate all text features and masks
         all_text_features = torch.cat(all_text_features, dim=0)
         all_text_masks = torch.cat(all_text_masks, dim=0)
-
     # ----------------------------------
     # 2. calculate the similarity
     # ----------------------------------
-    logit_scale = model.clip.logit_scale.exp().item()
+    logit_scale = model.module.clip.logit_scale.exp().item()
     R100 = calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, 100, logit_scale, ground_truth)
-
     return R100
 
 def mean_pooling_for_similarity_visual(visual_output, video_mask,):
@@ -71,7 +65,8 @@ def calculate_simi(text_output, video_output, video_mask,  logit_scale):
 
 def calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, topn, logit_scale, ground_truth):
     recalls = []
-    for text_idx, (text_features, _) in enumerate(zip(all_text_features, all_text_masks)):
+    
+    for text_idx, text_features in tqdm(enumerate(all_text_features), total=len(all_text_features), desc="Calculate the Recall"):
         simi = calculate_simi(text_features.unsqueeze(0), all_video_features, all_video_masks, logit_scale)
         simi = simi.cpu().detach().numpy().flatten()
         

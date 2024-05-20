@@ -12,19 +12,17 @@
             "console": "integratedTerminal",
             "args": [
                 "--train_path", "/home/renjie.liang/datasets/TVR_Ranking/train_top01.jsonl",
-                "--val_path", "/home/renjie.liang/datasets/TVR_Ranking/val.jsonl",
-                "--test_path", "/home/renjie.liang/datasets/TVR_Ranking/test.jsonl",
+                "--val_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/val.jsonl",
+                "--test_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/test.jsonl",
                 "--video_path", "/home/share/rjliang/Dataset/TVR/frames",
                 "--corpus_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/video_corpus.json",
 
-                "--output_dir", "ckpts/debug",
+                "--output_dir", "result/debug",
                 "--max_words", "32", "--max_frames", "12",
 
-                "--do_train", "--num_workers=0", "--epochs=5", 
-                "--batch_size=4", "--batch_size_val", "16", "--step_log=50",
+                "--epochs=5",  "--batch_size=4", "--batch_size_val=16", "--step_log=50",
                 "--lr", "1e-4",
 
-                "--datatype", "msrvtt",
                 "--expand_msrvtt_sentences",
                 "--feature_framerate", "1", "--coef_lr", "1e-3",
                 "--freeze_layer_num", "0", "--slice_framepos", "2",

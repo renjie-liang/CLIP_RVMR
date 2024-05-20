@@ -4,62 +4,27 @@ from modules.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modules.modeling import CLIP4Clip
 import torch.nn as nn
 
-# def init_model(args, device):
-#     # Prepare model
-    
-#     cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-#     model = CLIP4Clip.from_pretrained(args.cross_model, cache_dir=cache_dir, task_config=args)
-    
-#     if torch.cuda.device_count() > 1:
-#         model = nn.DataParallel(model)
-#     model.to(device)
-#     return model
 
-def init_model(args, device):
-    # Prepare model
-    cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-    model = CLIP4Clip.from_pretrained(args.cross_model, cache_dir=cache_dir, task_config=args)
-    # model = CLIP4Clip(cross_config=args.cross_model, clip_state_dict=cache_dir, task_config=args)
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-    model.to(device)
-    return model
-
-
-def save_model(epoch, args, model, optimizer, tr_loss, type_name=""):
-    # Only save the model it-self
+def save_model(args, model, optimizer, suffix, logger):
     model_to_save = model.module if hasattr(model, 'module') else model
-    output_model_file = os.path.join(
-        args.output_dir, "pytorch_model.bin.{}{}".format("" if type_name=="" else type_name+".", epoch))
-    optimizer_state_file = os.path.join(
-        args.output_dir, "pytorch_opt.bin.{}{}".format("" if type_name=="" else type_name+".", epoch))
+    output_model_file = os.path.join(args.output_dir, f"{suffix}_model.bin")
+    optimizer_state_file = os.path.join(args.output_dir, f"{suffix}_optimizer.bin")
     torch.save(model_to_save.state_dict(), output_model_file)
-    torch.save({
-            'epoch': epoch,
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': tr_loss,
-            }, optimizer_state_file)
-    logger.info("Model saved to %s", output_model_file)
-    logger.info("Optimizer saved to %s", optimizer_state_file)
+    torch.save(optimizer.state_dict(), optimizer_state_file)
+    
+    logger.info(f"Model saved to {output_model_file}")
+    logger.info(f"Optimizer saved to {optimizer_state_file}")
     return output_model_file
 
-def load_model(epoch, args, device, model_file=None):
-    if model_file is None or len(model_file) == 0:
-        model_file = os.path.join(args.output_dir, "pytorch_model.bin.{}".format(epoch))
-    if os.path.exists(model_file):
-        model_state_dict = torch.load(model_file, map_location='cpu')
-        if args.local_rank == 0:
-            logger.info("Model loaded from %s", model_file)
-        # Prepare model
-        cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-        model = CLIP4Clip.from_pretrained(args.cross_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
 
-        model.to(device)
-    else:
-        model = None
+def load_model(args, model_file):
+    model_state_dict = torch.load(model_file, map_location='cpu')
+    cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
+    print(f"cache_dir: {cache_dir}")
+    model = CLIP4Clip.from_pretrained(args, cache_dir=cache_dir, state_dict=model_state_dict)
     return model
 
-def prep_optimizer(args, model, num_train_optimization_steps, device, coef_lr=1.):
+def prep_optimizer(args, model, num_train_optimization_steps, logger, coef_lr=1.0):
 
     if hasattr(model, 'module'):
         model = model.module
@@ -84,11 +49,13 @@ def prep_optimizer(args, model, num_train_optimization_steps, device, coef_lr=1.
         {'params': [p for n, p in no_decay_noclip_param_tp], 'weight_decay': 0.0}
     ]
 
-    scheduler = None
     optimizer = BertAdam(optimizer_grouped_parameters, lr=args.lr, warmup=args.warmup_proportion,
                          schedule='warmup_cosine', b1=0.9, b2=0.98, e=1e-6,
                          t_total=num_train_optimization_steps, weight_decay=weight_decay,
                          max_grad_norm=1.0)
-                                                    
-    return optimizer, scheduler, model
+    if args.optimizer_path is not None:
+        optimizer_data = torch.load(args.optimizer_path, map_location='cpu')
+        optimizer.load_state_dict(optimizer_data)                                           
+        logger.info(f"Load optimizer from {args.optimizer_path}")
+    return optimizer
 

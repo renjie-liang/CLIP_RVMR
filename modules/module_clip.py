@@ -460,7 +460,6 @@ class CLIP(nn.Module):
 
     def encode_text(self, text, return_hidden=False):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
-
         pos_emd = self.positional_embedding[:x.size(1), :].type(self.dtype)
         x = x + pos_emd
         x = x.permute(1, 0, 2)  # NLD -> LND
