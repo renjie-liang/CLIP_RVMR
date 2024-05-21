@@ -27,7 +27,7 @@ def resize_and_save_images(input_dir, output_dir, size=(224, 224)):
             cv2.imwrite(output_file_path, resized_image)
 
 # Specify the input and output directories
-input_directory = "/home/share/rjliang/Dataset/TVR/frames"
+input_directory = "/home/share/rjliang/Dataset/TVR/frame_224"
 output_directory = "/home/share/rjliang/Dataset/TVR/frame_224"
 
 # Call the function

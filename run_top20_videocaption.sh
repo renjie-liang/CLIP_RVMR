@@ -2,10 +2,10 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 python main_video_retrieval.py \
     --train_path ./data/TVR_Ranking/train_top20_video_caption.jsonl \
-    --val_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/val.jsonl \
-    --test_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/test.jsonl \
-    --video_path /home/share/rjliang/Dataset/TVR/frames \
-    --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v2/video_corpus.json \
+    --val_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl \
+    --test_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl \
+    --video_path /home/share/rjliang/Dataset/TVR/frame_224 \
+    --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json \
     --output_dir result/tvrr_video_videocaption_top20 \
     --experiment_remark  top20 \
     --batch_size 16  --batch_size_val 16 --lr 1e-4 \

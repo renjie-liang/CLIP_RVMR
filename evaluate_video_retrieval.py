@@ -19,14 +19,14 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             all_video_masks.append(video_masks)
             
             # n += 1
-            # if n > 10:
+            # if n > 100:
             #     break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
         all_video_masks = torch.cat(all_video_masks, dim=0)
     return all_video_features, all_video_masks
 
-def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth):
+def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth, corpus_videos, topk):
     all_video_features, all_video_masks = corpus_feature
     all_text_features, all_text_masks = [], []
     with torch.no_grad():
@@ -47,7 +47,7 @@ def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth):
     # 2. calculate the similarity
     # ----------------------------------
     logit_scale = model.module.clip.logit_scale.exp().item()
-    R100 = calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, 100, logit_scale, ground_truth)
+    R100 = calculate_recall_topk(all_text_features, all_video_features, all_video_masks, topk, logit_scale, ground_truth, corpus_videos)
     return R100
 
 
@@ -73,7 +73,7 @@ def calculate_simi_batch(text_output, video_output, video_mask, logit_scale):
     retrieve_logits = logit_scale * torch.matmul(text_output, video_output.t())
     return retrieve_logits
 
-def calculate_recall_topn(all_text_features, all_text_masks, all_video_features, all_video_masks, topn, logit_scale, ground_truth):
+def calculate_recall_topk(all_text_features, all_video_features, all_video_masks, topk, logit_scale, ground_truth, corpus_videos):
     all_text_features = all_text_features.squeeze(1)
     all_text_features = all_text_features.contiguous()
     all_video_features = all_video_features.contiguous()
@@ -82,12 +82,14 @@ def calculate_recall_topn(all_text_features, all_text_masks, all_video_features,
     simi_matrix = simi_matrix.cpu().detach().numpy()
     recalls = []
     for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
+        breakpoint()
         simi = simi_matrix[text_idx]
         gt_videos = ground_truth[text_idx]
         # Get top N similar video indices
-        top_n_indices = np.argsort(-simi)[:topn]
+        top_n_indices = np.argsort(-simi)[:topk]
+        top_n_video_names = [corpus_videos[i] for i in top_n_indices]
         # Calculate recall
-        recall = sum(1 for gt in gt_videos if gt in top_n_indices) / len(gt_videos)
+        recall = sum(1 for gt in gt_videos if gt in top_n_video_names) / len(gt_videos)
         recalls.append(recall)
 
     average_recall = np.mean(recalls)

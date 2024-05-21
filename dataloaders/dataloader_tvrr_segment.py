@@ -8,10 +8,11 @@ from utils.utils import load_jsonl, load_json
 import torch
 import cv2
 
-class TVRR_Base_DataLoader(Dataset):
+class TVRR_Base_DataLoader_segment(Dataset):
     def __init__(self):
         self.SPECIAL_TOKEN = {"CLS_TOKEN": "<|startoftext|>", "SEP_TOKEN": "<|endoftext|>",
                               "MASK_TOKEN": "[MASK]", "UNK_TOKEN": "[UNK]", "PAD_TOKEN": "[PAD]"}
+        
     def _prepare_text(self, sentence):
         # Tokenize the sentence and add special tokens
         words = [self.SPECIAL_TOKEN["CLS_TOKEN"]] + self.tokenizer.tokenize(sentence) + [self.SPECIAL_TOKEN["SEP_TOKEN"]]
@@ -39,35 +40,21 @@ class TVRR_Base_DataLoader(Dataset):
 
         return input_ids, input_mask
     
-    def _get_frames(self, frame_path, n, HW):
-        # Get a list of all frame files
-        frame_files = sorted([f for f in os.listdir(frame_path)])
-        
-        # Select frames with the same step
-        total_frames = len(frame_files)
-        step = max(1, total_frames // n)
-        selected_frames = frame_files[::step][:n]
-        
-        # Load frames and resize to 224x224
-        frames = []
-        for frame_file in selected_frames:
-            frame = cv2.imread(os.path.join(frame_path, frame_file))
-            if not (frame.shape[1] == HW and frame.shape[2] == HW):
-                frame = cv2.resize(frame, (HW, HW))
-            frames.append(frame)
-        return frames
-       
-    def _prepare_video(self, video_id):
-        frame_path = os.path.join(self.video_path, video_id)
+    def _prepare_segment(self, video_name, segment_idx, duration, segment_second, fps):
+        frame_path = os.path.join(self.video_path, video_name)
+        # fist check the fps, duration, and the number frame in frame_path
+        # number_frames = len(os.listdir(frame_path))
+        # number_expectation = math.floor(duration * self.fps)
+        # assert  abs(number_frames - number_expectation) < 3, f"{video_name} {duration} {number_frames}"
+
         image_size = self.image_resolution
-        frames =  self._get_frames(frame_path, self.max_frames, image_size)
+        frames =  self._get_segment_frames(frame_path, segment_idx, image_size, segment_second, fps)
         
         total_frames = len(frames)
         # Pad if there are fewer frames than self.max_frames
         if len(frames) < self.max_frames:
             padding_frames = [np.zeros((image_size, image_size, 3), dtype=np.uint8)] * (self.max_frames - len(frames))
             frames.extend(padding_frames)    
-        
         
         # Convert frames to tensor with shape [1 x self.max_frames x 1 x 3 x H x W]
         frames = np.stack(frames, axis=0)  # [self.max_frames x 224 x 224 x 3]
@@ -82,10 +69,59 @@ class TVRR_Base_DataLoader(Dataset):
         assert len(video_mask) == self.max_frames
         return frames, video_mask
 
+    def _get_segment_frames(self, frame_path, segment_idx, HW, segment_second, fps):
+        n = self.max_frames
+        start_frame = segment_idx * segment_second * fps
+        end_frame = (segment_idx + 1) * segment_second * fps
+        
+        frame_files = sorted([f for f in os.listdir(frame_path)])
+        total_frames = len(frame_files)
+        
+        # Ensure end_frame does not exceed total_frames
+        end_frame = min(end_frame, total_frames)
+        
+        # Select frames within the start_frame and end_frame
+        segment_frame_files = frame_files[int(start_frame):int(end_frame)]
+        
+        # Sample n frames from the segment
+        step = max(1, len(segment_frame_files) // n)
+        selected_frames = segment_frame_files[::step][:n]
+        
+        frames = []
+        for frame_file in selected_frames:
+            frame = cv2.imread(os.path.join(frame_path, frame_file))
+            if frame.shape[0] != HW or frame.shape[1] != HW:
+                frame = cv2.resize(frame, (HW, HW))
+            frames.append(frame)
+        return frames
+    
+
+class TVRR_DataLoader_corpus_segment(TVRR_Base_DataLoader_segment):
+    def __init__(self, corpus_path, video_path,
+                feature_framerate=1.0, max_frames=100,
+                image_resolution=224, frame_order=0, slice_framepos=0,
+    ):
+        
+        self.corpus = load_jsonl(corpus_path)
+        self.corpus_video_list = [i["video_name"] for i in self.corpus]
+        self.video_path = video_path
+        self.max_frames = max_frames
+        self.image_resolution = image_resolution
+        self.segment_second = 4 
+        self.fps = 3
+    def __len__(self):
+        return len(self.corpus)
+
+    def __getitem__(self, idx):
+        anno = self.corpus[idx]
+        video_name = anno["video_name"]
+        segment_idx = anno["segment_idx"]
+        duration = anno["duration"]
+        video, video_mask = self._prepare_segment(video_name, segment_idx, duration, self.segment_second, self.fps)
+        return video, video_mask
 
 
-
-class TVRR_DataLoader_train(TVRR_Base_DataLoader):
+class TVRR_DataLoader_train_segment(TVRR_Base_DataLoader_segment):
     def __init__(self, annotation_path, video_path, tokenizer,
                 max_words=30, feature_framerate=1.0, max_frames=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
@@ -93,88 +129,35 @@ class TVRR_DataLoader_train(TVRR_Base_DataLoader):
         super().__init__()
         
         self.annotation = load_jsonl(annotation_path)
+        self.annotation = self.expand_annotation(self.annotation)
         self.video_path = video_path
-        
         self.max_words = max_words
         self.max_frames = max_frames
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
-        
+        self.fps = 3
+        self.segment_second = 4
         
     def __len__(self):
         return len(self.annotation)
 
     def __getitem__(self, idx):
-        
         anno = self.annotation[idx]
         text = anno["query"]
-        video_id = anno["video_name"]
-        # simi = anno["similarity"]
         text_id, text_mask = self._prepare_text(text)
-        video, video_mask = self._prepare_video(video_id)
+
+        video_name = anno["video_name"]
+        segment_idx = anno["segment_idx"]
+        duration = anno["duration"]
+        video, video_mask = self._prepare_segment(video_name, segment_idx, duration, self.segment_second, self.fps)
         return text_id, text_mask, video, video_mask
 
-        
-        
-class TVRR_DataLoader_eval(TVRR_Base_DataLoader):
-    def __init__(self, annotation_path, corpus_path, video_path, tokenizer,
-                max_words=30, feature_framerate=1.0, max_frames=100,
-                image_resolution=224, frame_order=0, slice_framepos=0,
-    ):
-        super().__init__()
-        self.annotation = load_jsonl(annotation_path)
-        self.video_path = video_path
-        self.max_words = max_words
-        self.max_frames = max_frames
-        self.image_resolution = image_resolution
-        self.tokenizer = tokenizer
-        self.ground_truth = self.generate_gt()
-        
-    def __len__(self):
-        return len(self.annotation)
-
-    def __getitem__(self, idx):
-        anno = self.annotation[idx]
-        text = anno["query"]
-        text_id, text_mask = self._prepare_text(text)
-        return text_id, text_mask
-        
-    def generate_gt(self):
-        all_gt = []
-        for record in self.annotation:
-            one_text_gt = []
-            for i in record["relevant_moment"]:
-                video_name = i["video_name"]
-                relevance = i["relevance"]
-                if relevance >= 1:
-                    one_text_gt.append(video_name)
-            if len(one_text_gt) == 0:
-                video_name = record["relevant_moment"][0]["video_name"]
-                one_text_gt.append(video_name)
-            all_gt.append(one_text_gt)
-        return all_gt
-
-
-
-class TVRR_DataLoader_corpus(TVRR_Base_DataLoader):
-    def __init__(self, corpus_path, video_path,
-                feature_framerate=1.0, max_frames=100,
-                image_resolution=224, frame_order=0, slice_framepos=0,
-    ):
-        self.corpus_map = load_json(corpus_path)
-        self.corpus = list(self.corpus_map.keys())
-        self.video_path = video_path
-        self.max_frames = max_frames
-        self.image_resolution = image_resolution
-        
-    def __len__(self):
-        return len(self.corpus)
-
-    def __getitem__(self, idx):
-        video_id = self.corpus[idx]
-        video, video_mask = self._prepare_video(video_id)
-        return video, video_mask
-
-
-
-
+    def expand_annotation(self, annotation):
+        new_annotation = []
+        for i in annotation:
+            query = i["query"]
+            relevant_segment = i["relevant_segment"]
+            for segment in relevant_segment:
+                segment.update({'query': query})
+                new_annotation.append(segment)
+        return new_annotation

@@ -1,15 +1,15 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-
 python main_video_retrieval.py \
-    --train_path /home/renjie.liang/datasets/TVR_Ranking/train_top20.jsonl \
+    --train_path data/TVR_Ranking/train_top20_segment.jsonl \
     --val_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl \
     --test_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl \
     --video_path /home/share/rjliang/Dataset/TVR/frame_224 \
-    --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json \
-    --output_dir result/tvrr_video_query_top20 \
+    --corpus_path data/TVR_Ranking/segment_corpus_4seconds.jsonl \
+    --output_dir result/tvrr_segment_top20 \
+    --data_name tvrr_segment \
     --experiment_remark  top20 \
-    --batch_size 8  --batch_size_val 8 --lr 1e-4 \
-    --step_log=200 --step_eval=1000 \
+    --batch_size 100  --batch_size_val 100 --lr 1e-4 \
+    --step_log=200 --step_eval=10000 \
+    --recall_topk 1000 \
     --max_words 32 --max_frames 12 \
     --feature_framerate 1 --coef_lr 1e-3 \
     --freeze_layer_num 0  --slice_framepos 2 \
@@ -18,5 +18,5 @@ python main_video_retrieval.py \
     # --checkpoint_path result/tvrr_video_query/best_model.bin \
     # --optimizer_path result/tvrr_video_query/best_optimizer.bin
 
-# qsub -I -l select=1:ngpus=1 -P gs_slab -q gpu8
-# cd /home/renjie.liang/12_RVMR_IR/CLIP4Clip ; conda activate py11 ; sh run_top20.sh
+# qsub -I -l select=1:ngpus=4 -P gs_slab -q gpu8
+# cd /home/renjie.liang/12_RVMR_IR/CLIP4Clip ; conda activate py11 ; sh run_top20_segment.sh

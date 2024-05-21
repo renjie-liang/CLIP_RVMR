@@ -7,9 +7,9 @@ from utils.utils_model import prep_optimizer, save_model, load_model
 from utils.setup import get_args, set_seed_logger
 
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
-from dataloaders.data_dataloaders import dataloader_TVRR_train, dataloader_TVRR_eval, dataloader_TVRR_video_corpus
+from dataloaders.data_dataloaders import prepare_dataloader_video, prepare_dataloader_segment
 from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
-from modules.modeling import CLIP4Clip
+# from modules.modeling import CLIP4Clip
 import time
 
 def main():
@@ -36,43 +36,21 @@ def main():
         model.to(device)
             
 
-    ## ####################################
-    # freeze testing
-    ## ####################################
-    assert args.freeze_layer_num <= 12 and args.freeze_layer_num >= -1
-    if hasattr(model, "clip") and args.freeze_layer_num > -1:
-        for name, param in model.clip.named_parameters():
-            # top layers always need to train
-            if name.find("ln_final.") == 0 or name.find("text_projection") == 0 or name.find("logit_scale") == 0 \
-                    or name.find("visual.ln_post.") == 0 or name.find("visual.proj") == 0:
-                continue    # need to train
-            elif name.find("visual.transformer.resblocks.") == 0 or name.find("transformer.resblocks.") == 0:
-                layer_num = int(name.split(".resblocks.")[1].split(".")[0])
-                if layer_num >= args.freeze_layer_num:
-                    continue    # need to train
 
-            if args.linear_patch == "3d" and name.find("conv2."):
-                continue
-            else:
-                # paramenters which < freeze_layer_num will be freezed
-                param.requires_grad = False
-
-    train_dataloader, train_dataset = dataloader_TVRR_train(args.train_path, args, tokenizer)
-    val_dataloader, val_dataset = dataloader_TVRR_eval(args.val_path, args, tokenizer)
-    test_dataloader, test_dataset = dataloader_TVRR_eval(args.test_path, args, tokenizer)
-    corpus_dataloader = dataloader_TVRR_video_corpus(args.corpus_path, args)
+    if args.data_name == "tvrr_segment":
+        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_segment(args, tokenizer)
+    elif args.data_name == "tvrr_video":
+        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_video(args, tokenizer)
 
     num_train_optimization_steps = len(train_dataloader) * args.epochs
     optimizer = prep_optimizer(args, model, num_train_optimization_steps, logger, coef_lr=args.coef_lr)
 
-        
     best_score = -1.0
     time_grab_data = 0
     time_to_divice = 0
     time_forward = 0
     time_backward = 0
     start_time = time.time()
-    
     
     ## ####################################
     # train and eval
@@ -107,24 +85,31 @@ def main():
 
             if step % args.step_log == 0 or step % len(train_dataloader) == 0:
                 logger.info(f"Epoch: {epoch}/{args.epochs}, Step: {step}/{len(train_dataloader)}, Loss: {loss.item():.6f}")
+                print("-------------------------")
                 print(f"time_grab_data: {time_grab_data:.4f}")
                 print(f"time_to_divice: {time_to_divice:.4f}")
                 print(f"time_forward: {time_forward:.4f}")
                 print(f"time_backward: {time_backward:.4f}")
+                for i in range(torch.cuda.device_count()):
+                    print(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
+                    print(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
+                print("-------------------------")
+                
             
-            # if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
-            if step % 1 == 0 or step % len(train_dataloader) == 0:
-                corpus_feature = grab_corpus_feature(model, corpus_dataloader, device)
-                val_r100 = eval_epoch(model, val_dataloader, corpus_feature, device, val_dataset.ground_truth)
-                logger.info(f"\nVAL Recall@100: {val_r100:.4f}\n")
-                test_r100 = eval_epoch(model, test_dataloader, corpus_feature, device, test_dataset.ground_truth)
-                logger.info(f"\nTEST Recall@100: {test_r100:.4f}\n")
+            
+            if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
+            # if step % 1 == 0 or step % len(train_dataloader) == 0:
+                corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * l * 512 
+                val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_videos, args.recall_topk)
+                logger.info(f"\nVAL Recall@100: {val_recall:.4f}\n")
+                test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_videos, args.recall_topk)
+                logger.info(f"\nTEST Recall@100: {test_recall:.4f}\n")
 
-                if val_r100 > best_score:
-                    best_score = val_r100
+                if val_recall > best_score:
+                    best_score = val_recall
                     save_model(args, model, optimizer, suffix="best", logger=logger)
-                    logger.info(f"BEST VAL Recall@100: {val_r100:.4f}")
-                    logger.info(f"BEST TEST Recall@100: {test_r100:.4f}")
+                    logger.info(f"BEST VAL Recall@100: {val_recall:.4f}")
+                    logger.info(f"BEST TEST Recall@100: {test_recall:.4f}")
 
 if __name__ == "__main__":
     main()

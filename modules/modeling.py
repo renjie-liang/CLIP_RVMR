@@ -42,6 +42,7 @@ class CLIP4ClipPreTrainedModel(PreTrainedModel, nn.Module):
         cross_config, _ = CrossConfig.get_config(cross_model_name, cache_dir, type_vocab_size, state_dict=None, task_config=task_config)
 
         model = cls(cross_config, clip_state_dict, task_config=task_config, *inputs, **kwargs)
+        # model = CLIP4Clip(cross_config, clip_state_dict, task_config)
 
         ## ===> Initialization trick [HARD CODE]
         if model.linear_patch == "3d":
@@ -238,7 +239,7 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, attention_mask, video, video_mask=None):
+    def forward(self, input_ids, attention_mask, video, video_mask):
         sequence_output = self.get_sequence_output(input_ids, attention_mask)
         visual_output = self.get_visual_output(video, video_mask)
 
@@ -252,25 +253,17 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         return loss
 
     def get_sequence_output(self, input_ids, attention_mask):
-        # input_ids = input_ids.view(-1, input_ids.shape[-1])
-        # attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
         bs_pair = input_ids.size(0)
         sequence_hidden = self.clip.encode_text(input_ids).float()
         sequence_hidden = sequence_hidden.view(bs_pair, -1, sequence_hidden.size(-1))
         return sequence_hidden
 
     def get_visual_output(self, video, video_mask):
-        
-        video_mask = video_mask.view(-1, video_mask.shape[-1])
-        video = torch.as_tensor(video).float()
-        b, pair, bs, ts, channel, h, w = video.shape
-        video = video.view(b * pair * bs * ts, channel, h, w)
-        video_frame = bs * ts
-
+        b, video_frame, channel, h, w = video.shape
+        video = video.view(b * video_frame, channel, h, w)
         bs_pair = video_mask.size(0)
         visual_hidden = self.clip.encode_image(video, video_frame=video_frame).float()
         visual_hidden = visual_hidden.view(bs_pair, -1, visual_hidden.size(-1))
-
         return visual_hidden
 
 

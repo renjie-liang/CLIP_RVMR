@@ -88,6 +88,9 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--experiment_remark", type=str)
     parser.add_argument("--checkpoint_path", type=str)
     parser.add_argument("--optimizer_path", type=str)
+    parser.add_argument("--data_name", type=str)
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--recall_topk', type=int)
     
     args = parser.parse_args()
 
