@@ -59,7 +59,7 @@ Raw videos can be download from [LisaAnne/LocalizingMoments](https://github.com/
 
 ## Compress Video for Speed-up (optional)
 ```sh
-python preprocess/compress_video.py --input_root [raw_video_path] --output_root [compressed_video_path]
+python preprocess/compress_video.py --input_root [raw_video_dir] --output_root [compressed_video_dir]
 ```
 This script will compress the video to *3fps* with width *224* (or height *224*). Modify the variables for your customization.
 
@@ -103,7 +103,7 @@ main_task_retrieval.py --do_train --num_workers=0 \
 --data_path ${DATA_PATH}/MSRVTT_data.json \
 --features_path ${DATA_PATH}/MSRVTT_Videos \
 --output_dir ckpts/ckpt_msrvtt_retrieval_looseType \
---lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 16 \
+--lr 1e-4 --max_words 32 --max_frame_count 12 --batch_size_val 16 \
 --datatype msrvtt --expand_msrvtt_sentences  \
 --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0  --slice_framepos 2 \
@@ -120,7 +120,7 @@ main_task_retrieval.py --do_train --num_workers=2 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/MSVD_Videos \
 --output_dir ckpts/ckpt_msvd_retrieval_looseType \
---lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 16 \
+--lr 1e-4 --max_words 32 --max_frame_count 12 --batch_size_val 16 \
 --datatype msvd \
 --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0 --slice_framepos 2 \
@@ -137,7 +137,7 @@ main_task_retrieval.py --do_train --num_workers=2 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/LSMDC_Videos \
 --output_dir ckpts/ckpt_lsmdc_retrieval_looseType \
---lr 1e-4 --max_words 32 --max_frames 12 --batch_size_val 16 \
+--lr 1e-4 --max_words 32 --max_frame_count 12 --batch_size_val 16 \
 --datatype lsmdc --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0  --slice_framepos 2 \
 --loose_type --linear_patch 2d --sim_header meanP \
@@ -154,7 +154,7 @@ main_task_retrieval.py --do_train --num_workers=2 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/Activity_Videos \
 --output_dir ckpts/ckpt_activity_retrieval_looseType \
---lr 1e-4 --max_words 64 --max_frames 64 --batch_size_val 16 \
+--lr 1e-4 --max_words 64 --max_frame_count 64 --batch_size_val 16 \
 --datatype activity --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0  --slice_framepos 2 \
 --loose_type --linear_patch 2d --sim_header meanP \
@@ -171,7 +171,7 @@ main_task_retrieval.py --do_train --num_workers=2 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH}/DiDeMo_Videos \
 --output_dir ckpts/ckpt_didemo_retrieval_looseType \
---lr 1e-4 --max_words 64 --max_frames 64 --batch_size_val 16 \
+--lr 1e-4 --max_words 64 --max_frame_count 64 --batch_size_val 16 \
 --datatype didemo --feature_framerate 1 --coef_lr 1e-3 \
 --freeze_layer_num 0  --slice_framepos 2 \
 --loose_type --linear_patch 2d --sim_header meanP \

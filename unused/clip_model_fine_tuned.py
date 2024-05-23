@@ -64,3 +64,27 @@ for epoch in range(num_epochs):
 # Save the fine-tuned model
 model.save_pretrained("path/to/save/fine_tuned_model")
 processor.save_pretrained("path/to/save/fine_tuned_model")
+
+
+
+# import torch
+# from PIL import Image
+# from transformers import CLIPProcessor, CLIPModel
+
+# # Load the pre-trained CLIP model and processor
+# model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+# processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+# # Load and preprocess the image
+# image_path = "path/to/your/image.jpg"
+# image = Image.open(image_path)
+# inputs = processor(images=image, return_tensors="pt")
+
+# # Encode the image
+# with torch.no_grad():
+#     image_features = model.get_image_features(**inputs)
+
+# # Normalize the features
+# image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+
+# print("Encoded image features:", image_features)

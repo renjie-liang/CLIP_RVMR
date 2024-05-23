@@ -8,7 +8,7 @@ from tqdm import tqdm
 # Load video corpus data
 video_corpus_path = "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json"
 segment_corpus_path = "data/TVR_Ranking/segment_corpus_1seconds.jsonl"
-video_path  = "/home/share/rjliang/Dataset/TVR/frame_224"
+video_dir  = "/home/share/rjliang/Dataset/TVR/frames"
 
 video_corpus = load_json(video_corpus_path)
 segment_corpus = []
@@ -20,7 +20,7 @@ fps = 3
 for video_name, (duration, _) in tqdm(video_corpus.items()):
     # Calculate the number of segments
     num_segments = int(duration // segment_second) + (1 if duration % segment_second > 0 else 0)
-    frame_path = os.path.join(video_path, video_name)
+    frame_path = os.path.join(video_dir, video_name)
         
     for segment_idx in range(num_segments):
         start_frame = segment_idx * segment_second * fps

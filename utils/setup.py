@@ -12,14 +12,13 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
 
     parser.add_argument('--num_workers', type=int, default=4, help='')
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')
-    parser.add_argument('--epochs', type=int, default=20, help='upper epoch limit')
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--batch_size_val', type=int, default=3500, help='batch size eval')
     parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate exp epoch decay')
     parser.add_argument('--video_dim', type=int, default=1024, help='video feature dimension')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--max_words', type=int, default=20, help='')
-    parser.add_argument('--max_frames', type=int, default=100, help='')
+    parser.add_argument('--max_frame_count', type=int, default=100, help='')
     parser.add_argument('--feature_framerate', type=int, default=1, help='')
     parser.add_argument('--margin', type=float, default=0.1, help='margin for loss')
     parser.add_argument('--hard_negative_rate', type=float, default=0.5, help='rate of intra negative sample')
@@ -77,11 +76,10 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     
     
     # -----------------
-    # parser.add_argument("--divice", default="gpu", type=str)
     parser.add_argument("--train_path", type=str)
     parser.add_argument("--val_path", type=str)
     parser.add_argument("--test_path", type=str)
-    parser.add_argument("--video_path", type=str)
+    parser.add_argument("--video_dir", type=str)
     parser.add_argument("--corpus_path", type=str)
     parser.add_argument("--step_eval", type=int)
     parser.add_argument('--step_log', type=int, default=100, help='Information display frequence')
@@ -91,7 +89,14 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--data_name", type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--recall_topk', type=int)
-    
+    parser.add_argument('--frame_dim', type=int, default=224)
+    parser.add_argument('--learning_rate', type=float)
+    parser.add_argument('--lr_step_size', type=int)
+    parser.add_argument('--lr_gamma', type=float)
+    parser.add_argument('--num_epochs', type=int, default=20, help='upper epoch limit')
+    parser.add_argument('--clip_model_name', default="openai/clip-vit-base-patch32",  type=str)
+    parser.add_argument('--read_video_from_tensor', action='store_true', help='Flag to read videos from tensor files')
+
     args = parser.parse_args()
 
     if args.sim_header == "tightTransf":

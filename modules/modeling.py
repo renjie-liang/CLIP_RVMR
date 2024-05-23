@@ -140,7 +140,7 @@ class CLIP4Clip(CLIP4ClipPreTrainedModel):
         self.task_config = task_config
         self.ignore_video_index = -1
 
-        assert self.task_config.max_words + self.task_config.max_frames <= cross_config.max_position_embeddings
+        assert self.task_config.max_words + self.task_config.max_frame_count <= cross_config.max_position_embeddings
 
         self._stage_one = True
         self._stage_two = False

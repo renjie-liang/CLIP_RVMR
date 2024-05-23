@@ -11,16 +11,21 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-
-                "--train_path", "data/TVR_Ranking/train_top20_segment.jsonl",
+                "--train_path", "/home/renjie.liang/datasets/TVR_Ranking/train_top01.jsonl",
                 "--val_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl",
                 "--test_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl",
-                "--video_path", "/home/share/rjliang/Dataset/TVR/frame_224",
+                "--video_dir", "/home/share/rjliang/Dataset/TVR/frames",
                 "--corpus_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json",
-                "--data_name", "tvrr_segment",
+                "--data_name", "query_video_clip",
+                // "--train_path", "data/TVR_Ranking/train_top20_segment.jsonl",
+                // "--val_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl",
+                // "--test_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl",
+                // "--video_dir", "/home/share/rjliang/Dataset/TVR/frames",
+                // "--corpus_path", "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json",
+                // "--data_name", "tvrr_segment",
 
                 "--output_dir", "result/debug",
-                "--max_words", "32", "--max_frames", "12",
+                "--max_words", "32", "--max_frame_count", "12",
 
                 "--epochs=5",  "--batch_size=4", "--batch_size_val=16", "--step_log=50",
                 "--lr", "1e-4",

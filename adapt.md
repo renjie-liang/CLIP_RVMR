@@ -17,4 +17,4 @@ video_mask (2, 1, 12)
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
 
-max_frames = 12, it's better to use the segmentation
+max_frame_count = 12, it's better to use the segmentation

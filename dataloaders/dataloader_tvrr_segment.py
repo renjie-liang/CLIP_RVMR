@@ -41,7 +41,7 @@ class TVRR_Base_DataLoader_segment(Dataset):
         return input_ids, input_mask
     
     def _prepare_segment(self, video_name, segment_idx, duration, segment_second, fps):
-        frame_path = os.path.join(self.video_path, video_name)
+        frame_path = os.path.join(self.video_dir, video_name)
         # fist check the fps, duration, and the number frame in frame_path
         # number_frames = len(os.listdir(frame_path))
         # number_expectation = math.floor(duration * self.fps)
@@ -51,26 +51,26 @@ class TVRR_Base_DataLoader_segment(Dataset):
         frames =  self._get_segment_frames(frame_path, segment_idx, image_size, segment_second, fps)
         
         total_frames = len(frames)
-        # Pad if there are fewer frames than self.max_frames
-        if len(frames) < self.max_frames:
-            padding_frames = [np.zeros((image_size, image_size, 3), dtype=np.uint8)] * (self.max_frames - len(frames))
+        # Pad if there are fewer frames than self.max_frame_count
+        if len(frames) < self.max_frame_count:
+            padding_frames = [np.zeros((image_size, image_size, 3), dtype=np.uint8)] * (self.max_frame_count - len(frames))
             frames.extend(padding_frames)    
         
-        # Convert frames to tensor with shape [1 x self.max_frames x 1 x 3 x H x W]
-        frames = np.stack(frames, axis=0)  # [self.max_frames x 224 x 224 x 3]
-        frames = frames.transpose(0, 3, 1, 2)  # [self.max_frames x 3 x 224 x 224]
+        # Convert frames to tensor with shape [1 x self.max_frame_count x 1 x 3 x H x W]
+        frames = np.stack(frames, axis=0)  # [self.max_frame_count x 224 x 224 x 3]
+        frames = frames.transpose(0, 3, 1, 2)  # [self.max_frame_count x 3 x 224 x 224]
         frames = torch.tensor(frames, dtype=torch.float)
         
         # Generate video_mask: 1 for real frames, 0 for padding
-        video_mask = [1] * min(total_frames, self.max_frames) + [0] * (self.max_frames - min(total_frames, self.max_frames))
+        video_mask = [1] * min(total_frames, self.max_frame_count) + [0] * (self.max_frame_count - min(total_frames, self.max_frame_count))
         video_mask = torch.tensor(video_mask, dtype=torch.long)
         
-        assert frames.shape == (self.max_frames, 3, 224, 224)
-        assert len(video_mask) == self.max_frames
+        assert frames.shape == (self.max_frame_count, 3, 224, 224)
+        assert len(video_mask) == self.max_frame_count
         return frames, video_mask
 
     def _get_segment_frames(self, frame_path, segment_idx, HW, segment_second, fps):
-        n = self.max_frames
+        n = self.max_frame_count
         start_frame = segment_idx * segment_second * fps
         end_frame = (segment_idx + 1) * segment_second * fps
         
@@ -97,15 +97,15 @@ class TVRR_Base_DataLoader_segment(Dataset):
     
 
 class TVRR_DataLoader_corpus_segment(TVRR_Base_DataLoader_segment):
-    def __init__(self, corpus_path, video_path,
-                feature_framerate=1.0, max_frames=100,
+    def __init__(self, corpus_path, video_dir,
+                feature_framerate=1.0, max_frame_count=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
         
         self.corpus = load_jsonl(corpus_path)
         self.corpus_video_list = [i["video_name"] for i in self.corpus]
-        self.video_path = video_path
-        self.max_frames = max_frames
+        self.video_dir = video_dir
+        self.max_frame_count = max_frame_count
         self.image_resolution = image_resolution
         self.segment_second = 4 
         self.fps = 3
@@ -122,17 +122,17 @@ class TVRR_DataLoader_corpus_segment(TVRR_Base_DataLoader_segment):
 
 
 class TVRR_DataLoader_train_segment(TVRR_Base_DataLoader_segment):
-    def __init__(self, annotation_path, video_path, tokenizer,
-                max_words=30, feature_framerate=1.0, max_frames=100,
+    def __init__(self, annotation_path, video_dir, tokenizer,
+                max_words=30, feature_framerate=1.0, max_frame_count=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
         super().__init__()
         
         self.annotation = load_jsonl(annotation_path)
         self.annotation = self.expand_annotation(self.annotation)
-        self.video_path = video_path
+        self.video_dir = video_dir
         self.max_words = max_words
-        self.max_frames = max_frames
+        self.max_frame_count = max_frame_count
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
         self.fps = 3

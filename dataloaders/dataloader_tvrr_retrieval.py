@@ -58,45 +58,45 @@ class TVRR_Base_DataLoader(Dataset):
         return frames
        
     def _prepare_video(self, video_id):
-        frame_path = os.path.join(self.video_path, video_id)
+        frame_path = os.path.join(self.video_dir, video_id)
         image_size = self.image_resolution
-        frames =  self._get_frames(frame_path, self.max_frames, image_size)
+        frames =  self._get_frames(frame_path, self.max_frame_count, image_size)
         
         total_frames = len(frames)
-        # Pad if there are fewer frames than self.max_frames
-        if len(frames) < self.max_frames:
-            padding_frames = [np.zeros((image_size, image_size, 3), dtype=np.uint8)] * (self.max_frames - len(frames))
+        # Pad if there are fewer frames than self.max_frame_count
+        if len(frames) < self.max_frame_count:
+            padding_frames = [np.zeros((image_size, image_size, 3), dtype=np.uint8)] * (self.max_frame_count - len(frames))
             frames.extend(padding_frames)    
         
         
-        # Convert frames to tensor with shape [1 x self.max_frames x 1 x 3 x H x W]
-        frames = np.stack(frames, axis=0)  # [self.max_frames x 224 x 224 x 3]
-        frames = frames.transpose(0, 3, 1, 2)  # [self.max_frames x 3 x 224 x 224]
+        # Convert frames to tensor with shape [1 x self.max_frame_count x 1 x 3 x H x W]
+        frames = np.stack(frames, axis=0)  # [self.max_frame_count x 224 x 224 x 3]
+        frames = frames.transpose(0, 3, 1, 2)  # [self.max_frame_count x 3 x 224 x 224]
         frames = torch.tensor(frames, dtype=torch.float)
         
         # Generate video_mask: 1 for real frames, 0 for padding
-        video_mask = [1] * min(total_frames, self.max_frames) + [0] * (self.max_frames - min(total_frames, self.max_frames))
+        video_mask = [1] * min(total_frames, self.max_frame_count) + [0] * (self.max_frame_count - min(total_frames, self.max_frame_count))
         video_mask = torch.tensor(video_mask, dtype=torch.long)
         
-        assert frames.shape == (self.max_frames, 3, 224, 224)
-        assert len(video_mask) == self.max_frames
+        assert frames.shape == (self.max_frame_count, 3, 224, 224)
+        assert len(video_mask) == self.max_frame_count
         return frames, video_mask
 
 
 
 
 class TVRR_DataLoader_train(TVRR_Base_DataLoader):
-    def __init__(self, annotation_path, video_path, tokenizer,
-                max_words=30, feature_framerate=1.0, max_frames=100,
+    def __init__(self, annotation_path, video_dir, tokenizer,
+                max_words=30, feature_framerate=1.0, max_frame_count=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
         super().__init__()
         
         self.annotation = load_jsonl(annotation_path)
-        self.video_path = video_path
+        self.video_dir = video_dir
         
         self.max_words = max_words
-        self.max_frames = max_frames
+        self.max_frame_count = max_frame_count
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
         
@@ -117,15 +117,15 @@ class TVRR_DataLoader_train(TVRR_Base_DataLoader):
         
         
 class TVRR_DataLoader_eval(TVRR_Base_DataLoader):
-    def __init__(self, annotation_path, corpus_path, video_path, tokenizer,
-                max_words=30, feature_framerate=1.0, max_frames=100,
+    def __init__(self, annotation_path, corpus_path, video_dir, tokenizer,
+                max_words=30, feature_framerate=1.0, max_frame_count=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
         super().__init__()
         self.annotation = load_jsonl(annotation_path)
-        self.video_path = video_path
+        self.video_dir = video_dir
         self.max_words = max_words
-        self.max_frames = max_frames
+        self.max_frame_count = max_frame_count
         self.image_resolution = image_resolution
         self.tokenizer = tokenizer
         self.ground_truth = self.generate_gt()
@@ -157,14 +157,14 @@ class TVRR_DataLoader_eval(TVRR_Base_DataLoader):
 
 
 class TVRR_DataLoader_corpus(TVRR_Base_DataLoader):
-    def __init__(self, corpus_path, video_path,
-                feature_framerate=1.0, max_frames=100,
+    def __init__(self, corpus_path, video_dir,
+                feature_framerate=1.0, max_frame_count=100,
                 image_resolution=224, frame_order=0, slice_framepos=0,
     ):
         self.corpus_map = load_json(corpus_path)
         self.corpus = list(self.corpus_map.keys())
-        self.video_path = video_path
-        self.max_frames = max_frames
+        self.video_dir = video_dir
+        self.max_frame_count = max_frame_count
         self.image_resolution = image_resolution
         
     def __len__(self):

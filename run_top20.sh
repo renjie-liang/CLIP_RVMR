@@ -4,13 +4,13 @@ python main_video_retrieval.py \
     --train_path /home/renjie.liang/datasets/TVR_Ranking/train_top20.jsonl \
     --val_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl \
     --test_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl \
-    --video_path /home/share/rjliang/Dataset/TVR/frame_224 \
+    --video_dir /home/share/rjliang/Dataset/TVR/frames \
     --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json \
     --output_dir result/tvrr_video_query_top20 \
     --experiment_remark  top20 \
     --batch_size 8  --batch_size_val 8 --lr 1e-4 \
     --step_log=200 --step_eval=1000 \
-    --max_words 32 --max_frames 12 \
+    --max_words 32 --max_frame_count 12 \
     --feature_framerate 1 --coef_lr 1e-3 \
     --freeze_layer_num 0  --slice_framepos 2 \
     --loose_type --linear_patch 2d --sim_header meanP \

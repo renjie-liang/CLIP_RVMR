@@ -12,7 +12,7 @@ from modules.optimization import BertAdam
 
 task_config = {"cross_model": 'cross-base',
           "max_words": 32,
-          "max_frames": 12,
+          "max_frame_count": 12,
           "max_position_embeddings": 128,
           "loose_type": True,
           "pretrained_clip_name": "ViT-B/16",

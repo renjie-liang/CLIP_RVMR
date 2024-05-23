@@ -2,30 +2,34 @@ import torch
 import torch.nn as nn
 
 from tqdm import tqdm
+import json
 
 from utils.utils_model import prep_optimizer, save_model, load_model
 from utils.setup import get_args, set_seed_logger
+from utils.utils import LossTracker, TimeTracker
 
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
-from dataloaders.data_dataloaders import prepare_dataloader_video, prepare_dataloader_segment
+from dataloaders.data_dataloaders import prepare_dataloader_video, prepare_dataloader_segment, prepare_dataloader_video_CLIP
 from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
+from transformers import CLIPProcessor, CLIPModel
+from modules.CLIPFineTuner import CLIPFineTuner
+from torch import nn, optim
+import torch.nn.functional as F
 
 def main():
     global logger
     args = get_args()
     logger = set_seed_logger(args)
-    logger.info(vars(args))
-    
-    tokenizer = ClipTokenizer()
-    if args.checkpoint_path is not None:
-        logger.info(f"Load model from {args.checkpoint_path}")
-        model = load_model(args, args.checkpoint_path)
-            # checkpoint = torch.load(args.resume_model, map_location='cpu')
-    else:
-        model = CLIP4Clip.from_pretrained(task_config=args)
-    
+    logger.info("Arguments:\n%s", json.dumps(vars(args), indent=4))
+    # if args.checkpoint_path is not None:
+    #     logger.info(f"Load model from {args.checkpoint_path}")
+    #     model = load_model(args, args.checkpoint_path)
+    #         # checkpoint = torch.load(args.resume_model, map_location='cpu')
+    model = CLIPFineTuner(args.clip_model_name)
+    model.freeze_layers(freeze_layer_count=10)
+    processor = CLIPProcessor.from_pretrained(args.clip_model_name)
     
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -34,82 +38,77 @@ def main():
     else:
         device = torch.device("cpu")
         model.to(device)
-            
-
 
     if args.data_name == "tvrr_segment":
         train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_segment(args, tokenizer)
     elif args.data_name == "tvrr_video":
         train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_video(args, tokenizer)
+    elif args.data_name == "query_video_clip":
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video_CLIP(args, processor)
 
-    num_train_optimization_steps = len(train_dataloader) * args.epochs
-    optimizer = prep_optimizer(args, model, num_train_optimization_steps, logger, coef_lr=args.coef_lr)
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
 
     best_score = -1.0
-    time_grab_data = 0
-    time_to_divice = 0
-    time_forward = 0
-    time_backward = 0
-    start_time = time.time()
+    time_tracker = TimeTracker()
+    epoch_loss_tracker = LossTracker()
     
-    ## ####################################
-    # train and eval
-    ## ####################################
-    for epoch in range(args.epochs):
+    model.train()
+    for epoch in range(args.num_epochs):
         # torch.cuda.empty_cache()
-        model.train()
+        time_tracker.start("grab_data")
         for step, batch_data in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
             step += 1
-            optimizer.zero_grad()
             
-            time_grab_data += time.time()  - start_time
-            start_time = time.time()
-            
+            time_tracker.stop("grab_data")
+            time_tracker.start("to_device")
             batch_data = [b.to(device) for b in batch_data]
             text_ids, text_masks, videos, video_masks = batch_data
-            
-            time_to_divice += time.time()  - start_time
-            start_time = time.time()
+            optimizer.zero_grad()
+            time_tracker.stop("to_device")
+
+            time_tracker.start("forward")
             loss = model(text_ids, text_masks, videos, video_masks)
-            time_forward += time.time()  - start_time
-            start_time = time.time()
-            
+            time_tracker.stop("forward")
+
+            time_tracker.start("backward")
             if loss.dim() > 0:  # Check if loss is not a scalar
                 loss = loss.mean()  # Apply reduction to make it a scalar
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            time_tracker.stop("backward")
+            time_tracker.start("grab_data")
 
-            time_backward += time.time()  - start_time
-            start_time = time.time()
-
+            epoch_loss_tracker.update(loss.item())
+            
             if step % args.step_log == 0 or step % len(train_dataloader) == 0:
-                logger.info(f"Epoch: {epoch}/{args.epochs}, Step: {step}/{len(train_dataloader)}, Loss: {loss.item():.6f}")
+                average_loss = epoch_loss_tracker.average_loss()
+                logger.info(f"Epoch: {epoch + 1}/{args.num_epochs}, Step: {step}/{len(train_dataloader)}, Loss: {average_loss:.6f}")
+                
                 print("-------------------------")
-                print(f"time_grab_data: {time_grab_data:.4f}")
-                print(f"time_to_divice: {time_to_divice:.4f}")
-                print(f"time_forward: {time_forward:.4f}")
-                print(f"time_backward: {time_backward:.4f}")
+                print(time_tracker.report())
+                epoch_loss_tracker.reset()
+                time_tracker.reset_all()
+                
                 for i in range(torch.cuda.device_count()):
                     print(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
                     print(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
                 print("-------------------------")
-                
-            
             
             if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
             # if step % 1 == 0 or step % len(train_dataloader) == 0:
-                corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * l * 512 
-                val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_videos, args.recall_topk)
-                logger.info(f"\nVAL Recall@100: {val_recall:.4f}\n")
-                test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_videos, args.recall_topk)
-                logger.info(f"\nTEST Recall@100: {test_recall:.4f}\n")
+                corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
+                val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
+                test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
+                logger.info(f"\nVAL  Recall@{args.recall_topk}: {val_recall:.4f}")
+                logger.info(f"TEST Recall@{args.recall_topk}: {test_recall:.4f}\n")
 
                 if val_recall > best_score:
                     best_score = val_recall
                     save_model(args, model, optimizer, suffix="best", logger=logger)
-                    logger.info(f"BEST VAL Recall@100: {val_recall:.4f}")
-                    logger.info(f"BEST TEST Recall@100: {test_recall:.4f}")
+                    logger.info(f"BEST VAL  Recall@{args.recall_topk}: {val_recall:.4f}")
+                    logger.info(f"BEST TEST Recall@{args.recall_topk}: {test_recall:.4f}")
+        scheduler.step()
 
 if __name__ == "__main__":
     main()
