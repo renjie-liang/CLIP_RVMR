@@ -16,19 +16,26 @@ class BaseVideoDataset(Dataset):
     def _prepare_video_frames(self, video_id):
         frame_path = os.path.join(self.video_dir, video_id)
         if self.read_video_from_tensor:
-            pass
+            frame_path = frame_path + ".pt"
+            frames, video_mask = self._extract_frames_tensor(frame_path, self.max_frame_count)
         else:
             frames = self._extract_frames(frame_path, self.max_frame_count)
-        
-        # Create a mask indicating valid frames
-        video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
-        video_mask = torch.tensor(video_mask, dtype=torch.long)
-
-        while len(frames) < self.max_frame_count:
-            frames.append(torch.zeros_like(frames[0]))
-        frames = torch.stack(frames)
+            # Create a mask indicating valid frames
+            video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
+            video_mask = torch.tensor(video_mask, dtype=torch.long)
+            while len(frames) < self.max_frame_count:
+                frames.append(torch.zeros_like(frames[0]))
+            frames = torch.stack(frames)
         return frames, video_mask      
 
+    def _extract_frames_tensor(self, frame_path, num_frames):
+        frames_tensor = torch.load(frame_path)
+        frames = frames_tensor['frames']
+        video_mask = frames_tensor['video_mask']
+        assert len(frames) == num_frames
+        assert len(video_mask) == num_frames
+        return frames, video_mask      
+        
     def _extract_frames(self, frame_path, num_frames, start_frame=None, end_frame=None):
         # Get a list of all frame files
         frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(('.png', '.jpg', '.jpeg'))])
@@ -64,9 +71,11 @@ class TrainVideoDataset(BaseVideoDataset):
     def __getitem__(self, idx):
         anno = self.annotations[idx]
         text = anno["query"]
+        query_id = anno["query_id"]
         video_id = anno["video_name"]
+        similarity = anno["similarity"]
         frames, video_mask = self._prepare_video_frames(video_id)
-        return text, frames, video_mask
+        return text, frames, video_mask, (query_id, video_id, similarity)
 
 class CorpusVideoDataset(BaseVideoDataset):
     def __init__(self, corpus_path, args):

@@ -56,10 +56,13 @@ def preprocess_and_save_frames(video_dir, tensor_dir, max_frame_count, frame_dim
     base_dataset = BaseVideoDataset(video_dir, max_frame_count, frame_dim)
     
     for video_id in tqdm(video_ids):
+
         tensor_path = os.path.join(tensor_dir, video_id + '.pt')
-        if os.path.isfile(tensor_path):
+        tmp = torch.load(tensor_path)
+        # if isinstance(tmp, torch.Tensor):
+            # pass
+        if  isinstance(tmp, dict):
             continue
-        
         frames, video_mask = base_dataset._prepare_video_frames(video_id)
         torch.save({'frames': frames, 'video_mask': video_mask}, tensor_path)
 

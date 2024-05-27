@@ -10,9 +10,7 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--do_pretrain", action='store_true', help="Whether to run training.")
 
-    parser.add_argument('--num_workers', type=int, default=4, help='')
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')
-    parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--batch_size_val', type=int, default=3500, help='batch size eval')
     parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate exp epoch decay')
     parser.add_argument('--video_dim', type=int, default=1024, help='video feature dimension')
@@ -63,7 +61,6 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument('--eval_frame_order', type=int, default=0, choices=[0, 1, 2],
                         help="Frame order, 0: ordinary order; 1: reverse order; 2: random order.")
 
-    parser.add_argument('--freeze_layer_num', type=int, default=0, help="Layer NO. of CLIP need to freeze.")
     parser.add_argument('--slice_framepos', type=int, default=0, choices=[0, 1, 2],
                         help="0: cut from head frames; 1: cut from tail frames; 2: extract frames uniformly.")
     parser.add_argument('--linear_patch', type=str, default="2d", choices=["2d", "3d"],
@@ -80,6 +77,8 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--val_path", type=str)
     parser.add_argument("--test_path", type=str)
     parser.add_argument("--video_dir", type=str)
+    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument("--corpus_path", type=str)
     parser.add_argument("--step_eval", type=int)
     parser.add_argument('--step_log', type=int, default=100, help='Information display frequence')
@@ -96,11 +95,13 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument('--num_epochs', type=int, default=20, help='upper epoch limit')
     parser.add_argument('--clip_model_name', default="openai/clip-vit-base-patch32",  type=str)
     parser.add_argument('--read_video_from_tensor', action='store_true', help='Flag to read videos from tensor files')
-
+    parser.add_argument('--freeze_layer_count', type=int)
     args = parser.parse_args()
 
-    if args.sim_header == "tightTransf":
-        args.loose_type = False
+    if args.debug:
+        args.batch_size = 4
+        args.num_workers = 1
+
 
     return args
 
