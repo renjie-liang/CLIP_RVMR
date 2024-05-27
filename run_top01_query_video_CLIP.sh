@@ -4,9 +4,9 @@ python main_video_retrieval.py \
     --test_path  ./data/TVR_Ranking/test.jsonl \
     --video_dir   /home/share/rjliang/Dataset/frames_tensor_12_224 \
     --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json \
-    --output_dir  ./result/tvrr_video_query \
+    --output_dir  ./result/tvrr_video_query_top01 \
     --data_name query_video_clip \
-    --experiment_remark  top01 \
+    --experiment_remark  constractive_loss_sim_mask \
     --recall_topk 100 \
     --batch_size 64  --batch_size_val 64 \
     --learning_rate 1e-4 --lr_step_size 5 --lr_gamma 0.1\

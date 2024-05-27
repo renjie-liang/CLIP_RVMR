@@ -43,7 +43,6 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--datatype", default="msrvtt", type=str, help="Point the dataset to finetune.")
 
     parser.add_argument("--world_size", default=0, type=int, help="distribted training")
-    parser.add_argument("--local_rank", default=0, type=int, help="distribted training")
     parser.add_argument("--rank", default=0, type=int, help="distribted training")
     parser.add_argument('--coef_lr', type=float, default=1., help='coefficient for bert branch.')
     parser.add_argument('--use_mil', action='store_true', help="Whether use MIL as Miech et. al. (2020).")
@@ -71,31 +70,36 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
 
     parser.add_argument("--pretrained_clip_name", default="ViT-B/32", type=str, help="Choose a CLIP version")
     
-    
     # -----------------
     parser.add_argument("--train_path", type=str)
     parser.add_argument("--val_path", type=str)
     parser.add_argument("--test_path", type=str)
     parser.add_argument("--video_dir", type=str)
-    parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument("--corpus_path", type=str)
+    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument("--checkpoint_path", type=str)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument("--step_eval", type=int)
     parser.add_argument('--step_log', type=int, default=100, help='Information display frequence')
     parser.add_argument("--experiment_remark", type=str)
-    parser.add_argument("--checkpoint_path", type=str)
-    parser.add_argument("--optimizer_path", type=str)
+    # parser.add_argument("--optimizer_path", type=str)
     parser.add_argument("--data_name", type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--recall_topk', type=int)
     parser.add_argument('--frame_dim', type=int, default=224)
-    parser.add_argument('--learning_rate', type=float)
-    parser.add_argument('--lr_step_size', type=int)
-    parser.add_argument('--lr_gamma', type=float)
     parser.add_argument('--num_epochs', type=int, default=20, help='upper epoch limit')
     parser.add_argument('--clip_model_name', default="openai/clip-vit-base-patch32",  type=str)
     parser.add_argument('--read_video_from_tensor', action='store_true', help='Flag to read videos from tensor files')
     parser.add_argument('--freeze_layer_count', type=int)
+    
+    parser.add_argument('--deepspeed_config', type=str, help='Path to DeepSpeed configuration file')
+    parser.add_argument('--local_rank',  type=int, default=0)
+    
+    
+    parser.add_argument('--learning_rate', type=float, default=1e-4)
+    parser.add_argument('--lr_step_size', type=int, default=5)
+    parser.add_argument('--lr_gamma', type=float, default=0.1)
+    
     args = parser.parse_args()
 
     if args.debug:

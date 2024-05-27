@@ -1,0 +1,18 @@
+{
+    "train_batch_size": 128,
+    "optimizer": {
+      "type": "AdamW",
+      "params": {
+        "lr": 1e-4
+      }
+    },
+    "scheduler": {
+      "type": "WarmupLR",
+      "params": {
+        "warmup_min_lr": 0,
+        "warmup_max_lr": 1e-4,
+        "warmup_num_steps": 1000
+      }
+    }
+  }
+  

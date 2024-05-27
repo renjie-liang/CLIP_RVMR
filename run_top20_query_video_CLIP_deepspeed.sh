@@ -1,4 +1,4 @@
-python main_video_retrieval.py  \
+deepspeed main_video_retrieval.py --deepspeed_config configs/ds_config.json \
     --train_path ./data/TVR_Ranking_old/train_top20.jsonl \
     --val_path   ./data/TVR_Ranking/val.jsonl \
     --test_path  ./data/TVR_Ranking/test.jsonl \
@@ -9,7 +9,6 @@ python main_video_retrieval.py  \
     --experiment_remark  constractive_loss_sim_mask \
     --recall_topk 100 \
     --batch_size 64  --batch_size_val 64 \
-    
     --step_log=100 --step_eval=1000 \
     --max_words 32 --max_frame_count 12 \
     --freeze_layer_count  10 \

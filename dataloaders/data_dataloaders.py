@@ -57,8 +57,8 @@ def collate_fn(processor, batch, task='train'):
 
 def prepare_dataloader_video_CLIP(args, processor):
     
-    train_dataset = TrainVideoDataset(annotation_path=args.train_path, args=args)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True, collate_fn=lambda batch: collate_fn(processor, batch, task='train'))
+    trainset = TrainVideoDataset(annotation_path=args.train_path, args=args)
+    train_dataloader = DataLoader(trainset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True, collate_fn=lambda batch: collate_fn(processor, batch, task='train'))
 
     corpus_dataset = CorpusVideoDataset(corpus_path=args.corpus_path, args=args)
     corpus_dataloader = DataLoader(corpus_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='corpus'))

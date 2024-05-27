@@ -19,7 +19,7 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             all_video_masks.append(video_masks)
             
             # n += 1
-            # if n > 50:
+            # if n > 10:
             #     break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
