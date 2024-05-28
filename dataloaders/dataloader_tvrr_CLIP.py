@@ -13,21 +13,21 @@ class BaseVideoDataset(Dataset):
         self.max_frame_count = args.max_frame_count
         self.frame_dim = args.frame_dim
 
+
     def _prepare_video_frames(self, video_id):
         frame_path = os.path.join(self.video_dir, video_id)
         if self.read_video_from_tensor:
-            pass
+            frame_path = frame_path + ".pt"
+            frames, video_mask = self._extract_frames_tensor(frame_path, self.max_frame_count)
         else:
             frames = self._extract_frames(frame_path, self.max_frame_count)
-        
-        # Create a mask indicating valid frames
-        video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
-        video_mask = torch.tensor(video_mask, dtype=torch.long)
-
-        while len(frames) < self.max_frame_count:
-            frames.append(torch.zeros_like(frames[0]))
-        frames = torch.stack(frames)
-        return frames, video_mask      
+            # Create a mask indicating valid frames
+            video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
+            video_mask = torch.tensor(video_mask, dtype=torch.long)
+            while len(frames) < self.max_frame_count:
+                frames.append(torch.zeros_like(frames[0]))
+            frames = torch.stack(frames)
+        return frames, video_mask       
 
     def _extract_frames(self, frame_path, num_frames, start_frame=None, end_frame=None):
         # Get a list of all frame files
@@ -52,7 +52,16 @@ class BaseVideoDataset(Dataset):
             frame_tensor = torch.tensor(frame, dtype=torch.float32).permute(2, 0, 1)  # Convert to CxHxW format
             frames.append(frame_tensor)
         return frames
-
+    
+    def _extract_frames_tensor(self, frame_path, num_frames):
+        frames_tensor = torch.load(frame_path)
+        frames = frames_tensor['frames']
+        video_mask = frames_tensor['video_mask']
+        frames = torch.tensor(frames, dtype=torch.float32).permute(2, 0, 1)  # Convert to CxHxW format
+        assert len(frames) == num_frames
+        assert len(video_mask) == num_frames
+        return frames, video_mask     
+    
 class TrainVideoDataset(BaseVideoDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
