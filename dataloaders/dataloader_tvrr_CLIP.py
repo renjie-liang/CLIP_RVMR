@@ -57,7 +57,7 @@ class BaseVideoDataset(Dataset):
         frames_tensor = torch.load(frame_path)
         frames = frames_tensor['frames']
         video_mask = frames_tensor['video_mask']
-        frames = torch.tensor(frames, dtype=torch.float32).permute(2, 0, 1)  # Convert to CxHxW format
+        frames = frames.permute(0, 3, 1, 2)  # Convert to CxHxW format
         assert len(frames) == num_frames
         assert len(video_mask) == num_frames
         return frames, video_mask     
