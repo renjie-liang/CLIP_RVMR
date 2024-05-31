@@ -84,7 +84,8 @@ class TrainVideoDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
         self.annotations = load_jsonl(annotation_path)
-        
+        self.annotations = self.expand_annotations(self.annotations)
+
     def __len__(self):
         return len(self.annotations)
 
@@ -96,6 +97,16 @@ class TrainVideoDataset(BaseDataset):
         frames, frames_mask = self._prepare_video(video_name)
         return query, frames, frames_mask, (query_id, video_name, 1)
 
+    def expand_annotations(self, annotations):
+        new_annotations = []
+        for i in annotations:
+            query = i["query"]
+            query_id = i["query_id"]
+            for moment in  i["relevant_moment"]:
+                moment.update({'query': query, 'query_id': query_id})
+                new_annotations.append(moment)
+        return new_annotations
+    
 class CorpusVideoDataset(BaseDataset):
     def __init__(self, corpus_path, args):
         super().__init__(args)
