@@ -5,7 +5,7 @@ import torch
 import cv2
 from utils.utils import load_jsonl, load_json
 
-class BaseVideoDataset(Dataset):
+class BaseDataset(Dataset):
     def __init__(self, args):
         super().__init__()
         self.read_video_from_tensor = args.read_video_from_tensor
@@ -14,7 +14,7 @@ class BaseVideoDataset(Dataset):
         self.frame_dim = args.frame_dim
 
 
-    def _prepare_video_frames(self, video_id):
+    def _prepare_video(self, video_id):
         frame_path = os.path.join(self.video_dir, video_id)
         if self.read_video_from_tensor:
             frame_path = frame_path + ".pt"
@@ -38,7 +38,6 @@ class BaseVideoDataset(Dataset):
             total_frames = len(frame_files)
             end_frame = min(end_frame, total_frames)
             frame_files = frame_files[int(start_frame):int(end_frame)]
-        
         # Calculate step size to select num_frames frames
         step = max(1, len(frame_files) // num_frames)
         selected_frames = frame_files[::step][:num_frames]
@@ -61,8 +60,27 @@ class BaseVideoDataset(Dataset):
         assert len(frames) == num_frames
         assert len(video_mask) == num_frames
         return frames, video_mask     
+
+
+    def _prepare_segment(self, video_name, segment_idx, segment_second, fps):
+        frame_path = os.path.join(self.video_dir, video_name)
+        start_frame = segment_idx * segment_second * fps
+        end_frame = (segment_idx + 1) * segment_second * fps
+        frames = self._extract_frames(frame_path, self.max_frame_count, start_frame, end_frame)
+        if len(frames) == 0:
+            print("0 frames:", video_name, segment_idx)
+            print("0 frames:", video_name, segment_idx)
+            print("0 frames:", video_name, segment_idx)
+        # Create a mask indicating valid frames
+        video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
+        video_mask = torch.tensor(video_mask, dtype=torch.long)
+        while len(frames) < self.max_frame_count:
+            frames.append(torch.zeros_like(frames[0]))
+        frames = torch.stack(frames)
+        return frames, video_mask
     
-class TrainVideoDataset(BaseVideoDataset):
+    
+class TrainVideoDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
         self.annotations = load_jsonl(annotation_path)
@@ -72,12 +90,13 @@ class TrainVideoDataset(BaseVideoDataset):
 
     def __getitem__(self, idx):
         anno = self.annotations[idx]
-        text = anno["query"]
-        video_id = anno["video_name"]
-        frames, video_mask = self._prepare_video_frames(video_id)
-        return text, frames, video_mask
+        query = anno["query"]
+        query_id = anno["query_id"]
+        video_name = anno["video_name"]
+        frames, frames_mask = self._prepare_video(video_name)
+        return query, frames, frames_mask, (query_id, video_name, 1)
 
-class CorpusVideoDataset(BaseVideoDataset):
+class CorpusVideoDataset(BaseDataset):
     def __init__(self, corpus_path, args):
         super().__init__(args)
         corpus_data = load_json(corpus_path)
@@ -89,12 +108,12 @@ class CorpusVideoDataset(BaseVideoDataset):
 
     def __getitem__(self, idx):
         video_id = self.corpus[idx]
-        video, video_mask = self._prepare_video_frames(video_id)
+        video, video_mask = self._prepare_video(video_id)
         return video, video_mask
 
 
      
-class EvalVideoDataset(BaseVideoDataset):
+class EvalVideoDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
         self.annotations = load_jsonl(annotation_path)
@@ -122,3 +141,96 @@ class EvalVideoDataset(BaseVideoDataset):
                 one_text_gt.append(video_name)
             all_gt.append(one_text_gt)
         return all_gt
+
+
+
+class TrainSegmentDataset(BaseDataset):
+    def __init__(self, annotation_path, args):
+        super().__init__(args)
+        self.annotations = load_jsonl(annotation_path)
+        self.annotations = self.expand_annotations(self.annotations)
+
+        self.segment_second = args.segment_second
+        self.fps = args.fps
+        
+    def __len__(self):
+        return len(self.annotations)
+
+    def __getitem__(self, idx):
+        anno = self.annotations[idx]
+        query = anno["query"]
+        query_id = anno["query_id"]
+        video_name = anno["video_name"]
+        segment_idx = anno["segment_idx"]
+        segment_name = video_name + "_" + str(segment_idx)
+        frames, frames_mask = self._prepare_segment(video_name, segment_idx, self.segment_second, self.fps)
+        return query, frames, frames_mask, (query_id, segment_name, 1)
+    
+    
+    def expand_annotations(self, annotations):
+        new_annotations = []
+        for i in annotations:
+            query = i["query"]
+            query_id = i["query_id"]
+            relevant_segment = i["relevant_segment"]
+            for segment in relevant_segment:
+                segment.update({'query': query, 'query_id': query_id})
+                new_annotations.append(segment)
+        return new_annotations
+    
+
+class CorpusSegmentDataset(BaseDataset):
+    def __init__(self, corpus_path, args):
+        super().__init__(args)
+        self.corpus = load_jsonl(corpus_path)
+        self.corpus_segment_list = [i["video_name"] + "_" + str(i["segment_idx"]) for i in self.corpus]
+        self.segment_second = args.segment_second
+        self.fps = args.fps
+        
+    def __len__(self):
+        return len(self.corpus)
+
+    def __getitem__(self, idx):
+        anno = self.corpus[idx]
+        video_name = anno["video_name"]
+        segment_idx = anno["segment_idx"]
+        frames, frames_mask = self._prepare_segment(video_name, segment_idx, self.segment_second, self.fps)
+        return frames, frames_mask
+
+
+
+     
+class EvalSegmentDataset(BaseDataset):
+    def __init__(self, annotation_path, args):
+        super().__init__(args)
+        self.annotations = load_jsonl(annotation_path)
+        self.ground_truth = self.generate_gt()
+        
+    def __len__(self):
+        return len(self.annotations)
+
+    def __getitem__(self, idx):
+        anno = self.annotations[idx]
+        text = anno["query"]
+        return text
+    
+    def generate_gt(self):
+        gt_all = []
+        for record in self.annotations:
+            gt_per_query = []
+            for i in record["relevant_segment"]:
+                video_name = i["video_name"]
+                segment_idx = i["segment_idx"]
+                relevance = i["relevance"]
+                segment_name = video_name + "_" + str(segment_idx)
+                if relevance >= 1:
+                    gt_per_query.append(segment_name)
+                    
+            if len(gt_per_query) == 0:
+                i = record["relevant_segment"][0]
+                video_name = i["video_name"]
+                segment_idx = i["segment_idx"]
+                segment_name = video_name + "_" + str(segment_idx)
+                gt_per_query.append(segment_name)
+            gt_all.append(gt_per_query)
+        return gt_all

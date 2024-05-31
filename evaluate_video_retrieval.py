@@ -17,9 +17,8 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             
             all_video_features.append(visual_output)
             all_video_masks.append(video_masks)
-            
             # n += 1
-            # if n > 50:
+            # if n > 30:
             #     break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
@@ -63,6 +62,7 @@ def calculate_recall_topk(model, all_text_features, all_video_features, all_vide
     for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
         simi = simi_matrix[text_idx]
         gt_videos = ground_truth[text_idx]
+        breakpoint()
         # Get top N similar video indices
         top_n_indices = np.argsort(-simi)[:topk]
         top_n_video_names = [corpus_videos[i] for i in top_n_indices]

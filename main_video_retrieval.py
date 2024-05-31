@@ -9,7 +9,7 @@ from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker
 
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
-from dataloaders.data_dataloaders import prepare_dataloader_video, prepare_dataloader_segment, prepare_dataloader_video_CLIP
+from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
 from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
@@ -28,7 +28,7 @@ def main():
     #     model = load_model(args, args.checkpoint_path)
     #         # checkpoint = torch.load(args.resume_model, map_location='cpu')
     model = CLIPFineTuner(args.clip_model_name)
-    model.freeze_layers(freeze_layer_count=10)
+    model.freeze_layers(freeze_layer_count=args.freeze_layer_num)
     processor = CLIPProcessor.from_pretrained(args.clip_model_name)
     
     if torch.cuda.is_available():
@@ -39,10 +39,8 @@ def main():
         device = torch.device("cpu")
         model.to(device)
 
-    if args.data_name == "tvrr_segment":
-        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_segment(args, tokenizer)
-    elif args.data_name == "tvrr_video":
-        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_video(args, tokenizer)
+    if args.data_name == "query_segment":
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_segment_CLIP(args, processor)
     elif args.data_name == "query_video_clip":
         train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video_CLIP(args, processor)
 
@@ -59,7 +57,6 @@ def main():
         time_tracker.start("grab_data")
         for step, batch_data in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
             step += 1
-            
             time_tracker.stop("grab_data")
             time_tracker.start("to_device")
             batch_data = [b.to(device) for b in batch_data]
@@ -78,7 +75,6 @@ def main():
             optimizer.step()
             time_tracker.stop("backward")
             time_tracker.start("grab_data")
-
             epoch_loss_tracker.update(loss.item())
             
             if step % args.step_log == 0 or step % len(train_dataloader) == 0:

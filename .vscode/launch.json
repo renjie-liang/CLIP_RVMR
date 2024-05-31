@@ -27,7 +27,7 @@
                 "--output_dir", "result/debug",
                 "--max_words", "32", "--max_frame_count", "12",
 
-                "--epochs=5",  "--batch_size=4", "--batch_size_val=16", "--step_log=50",
+                "--epochs=5",  "--batch_size=4",  "--step_log=50",
                 "--lr", "1e-4",
 
                 "--expand_msrvtt_sentences",

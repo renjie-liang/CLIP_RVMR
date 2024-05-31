@@ -1,7 +1,7 @@
 frame_data, work_nums, batch_size, GPUs, time_grab_data, time_backward
      image,         4,         64,    1,            110,            80,
      image,         4,        128,    2,            220,           135,
-     image,        16,        128,    2,            
+     image,        16,        128,    2,            200,           130,
     tensor,         4,         64,    1,             90,            80,
     tensor,        16,         64,    1,             55,            80,
-    tensor,        16,        128,    2,             90,           120,
+    tensor,        16,        128,    2,             90,           120,   best
