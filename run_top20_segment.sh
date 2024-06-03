@@ -6,16 +6,15 @@ python main_video_retrieval.py \
     --video_dir     /home/share/rjliang/Dataset/TVR/frames \
     --output_dir    result/tvrr_segment_top20 \
     --data_name     query_segment \
-    --step_log 100     --step_eval 5000 \
-    --recall_topk 1000 \
-    --batch_size 128 --num_workers 8 \
-    --learning_rate 1e-4 --lr_step_size 5 --lr_gamma 0.1 --coef_lr 1e-3 \
-    --max_words 32 --max_frame_count 4 \
+    --step_log 100     --step_eval 10000  --recall_topk 100 500 1000 \
+    --batch_size 256 --num_workers 8 \
+    --learning_rate 1e-6 --lr_step_size 50 --lr_gamma 0.1 \
+    --max_words 32 --max_frame_count 4 --freeze_layer_num 10 \
     --segment_second 4 --fps 3 \
     --experiment_remark  correct_contractive_loss
 
 
-# qsub -I -l select=1:ngpus=1 -P gs_slab -q slab_gpu8
+# qsub -I -l select=1:ngpus=2 -P gs_slab -q gpu8
 # cd /home/renjie.liang/12_RVMR_IR/CLIP_RVMR ; conda activate py11 ; sh run_top20_segment.sh
 
 

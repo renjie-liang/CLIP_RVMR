@@ -51,24 +51,28 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
-def calculate_recall_topk(model, all_text_features, all_video_features, all_video_masks, topk, ground_truth, corpus_videos):
+def calculate_recall_topk(model, all_text_features, all_video_features, all_video_masks, topks, ground_truth, corpus_videos):
     all_text_features = all_text_features.squeeze(1)
     all_text_features = all_text_features.contiguous()
     all_video_features = all_video_features.contiguous()
     # Calculate similarities in a batch
     simi_matrix = model.module.compute_similarity_matrix(all_text_features, all_video_features, all_video_masks)
     simi_matrix = simi_matrix.cpu().detach().numpy()
-    recalls = []
+    recalls_dict = {topk: [] for topk in topks}
+
     for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
         simi = simi_matrix[text_idx]
         gt_videos = ground_truth[text_idx]
-        breakpoint()
-        # Get top N similar video indices
-        top_n_indices = np.argsort(-simi)[:topk]
-        top_n_video_names = [corpus_videos[i] for i in top_n_indices]
         # Calculate recall
-        recall = sum(1 for gt in gt_videos if gt in top_n_video_names) / len(gt_videos)
-        recalls.append(recall)
+        for topk in topks:
+            # Get top N similar video indices
+            top_n_indices = np.argsort(-simi)[:topk]
+            top_n_video_names = [corpus_videos[i] for i in top_n_indices]
+            # Calculate recall
+            recall = sum(1 for gt in gt_videos if gt in top_n_video_names) / len(gt_videos)
+            recalls_dict[topk].append(recall)
 
-    average_recall = np.mean(recalls)
-    return average_recall
+    # Calculate the average recall for each topk
+    average_recalls = {topk: np.mean(recalls) for topk, recalls in recalls_dict.items()}
+    
+    return average_recalls

@@ -33,4 +33,4 @@ cd $PBS_O_WORKDIR
 ## Capture Number of Cores
 nprocs=`cat $PBS_NODEFILE|wc -l`
 
-conda run -n py11 run_top20_segment.sh
+conda run -n py11 sh run_top20_segment.sh

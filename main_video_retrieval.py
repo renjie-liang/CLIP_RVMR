@@ -94,16 +94,22 @@ def main():
             if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
             # if step % 1 == 0 or step % len(train_dataloader) == 0:
                 corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
-                val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
-                test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
-                logger.info(f"\nVAL  Recall@{args.recall_topk}: {val_recall:.4f}")
-                logger.info(f"TEST Recall@{args.recall_topk}: {test_recall:.4f}\n")
+                # Assuming eval_epoch returns a dictionary with recall values for each topk
+                val_recalls = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
+                test_recalls = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
 
-                if val_recall > best_score:
-                    best_score = val_recall
+                # Log each recall value for the given topk values
+                for topk in args.recall_topk:
+                    logger.info(f"VAL  Recall@{topk}: {val_recalls[topk]:.4f}")
+                    logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
+
+                # Use the first topk value as the criterion for best score
+                first_topk = args.recall_topk[0]
+                if val_recalls[first_topk] > best_score:
+                    best_score = val_recalls[first_topk]
                     save_model(args, model, optimizer, suffix="best", logger=logger)
-                    logger.info(f"BEST VAL  Recall@{args.recall_topk}: {val_recall:.4f}")
-                    logger.info(f"BEST TEST Recall@{args.recall_topk}: {test_recall:.4f}")
+                    logger.info(f"BEST VAL  Recall@{first_topk}: {val_recalls[first_topk]:.4f}")
+                    logger.info(f"BEST TEST Recall@{first_topk}: {test_recalls[first_topk]:.4f}")
         scheduler.step()
 
 if __name__ == "__main__":

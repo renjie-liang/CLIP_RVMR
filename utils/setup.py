@@ -25,12 +25,11 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--experiment_remark", type=str, help="Remarks for the current experiment")
     parser.add_argument("--data_name", type=str, required=True, help="Name of the dataset")
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
-    parser.add_argument('--recall_topk', type=int, help="Top K recall value")
+    parser.add_argument('--recall_topk', type=int, nargs='+', help="Top K recall values (e.g., --recall_topk 100 500 1000)")
 
     # Model and Training parameters
     parser.add_argument('--clip_model_name', type=str, default="openai/clip-vit-base-patch32", help="Name of the CLIP model")
     parser.add_argument('--learning_rate', type=float, required=True, help="Learning rate for training")
-    parser.add_argument('--coef_lr', type=float, default=1.0, help="Coefficient for learning rate adjustment")
     parser.add_argument('--lr_step_size', type=int, required=True, help="Step size for learning rate decay")
     parser.add_argument('--lr_gamma', type=float, required=True, help="Gamma for learning rate decay")
     parser.add_argument('--num_epochs', type=int, default=20, help="Number of epochs to train")

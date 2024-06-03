@@ -48,7 +48,7 @@ class BaseDataset(Dataset):
             frame = cv2.imread(os.path.join(frame_path, frame_file))
             frame = cv2.resize(frame, (self.frame_dim, self.frame_dim))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-            frame_tensor = torch.tensor(frame, dtype=torch.float32).permute(2, 0, 1)  # Convert to CxHxW format
+            frame_tensor = torch.tensor(frame, dtype=torch.float32).permute(2, 0, 1)  # Convert to CxHxW format, 3, 244, 244
             frames.append(frame_tensor)
         return frames
     
@@ -67,15 +67,17 @@ class BaseDataset(Dataset):
         start_frame = segment_idx * segment_second * fps
         end_frame = (segment_idx + 1) * segment_second * fps
         frames = self._extract_frames(frame_path, self.max_frame_count, start_frame, end_frame)
+        
+        
         if len(frames) == 0:
             print("0 frames:", video_name, segment_idx)
             print("0 frames:", video_name, segment_idx)
             print("0 frames:", video_name, segment_idx)
-        # Create a mask indicating valid frames
+            # Create a mask indicating valid frames
         video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
         video_mask = torch.tensor(video_mask, dtype=torch.long)
         while len(frames) < self.max_frame_count:
-            frames.append(torch.zeros_like(frames[0]))
+            frames.append(torch.zeros([3, self.frame_dim, self.frame_dim]))
         frames = torch.stack(frames)
         return frames, video_mask
     
