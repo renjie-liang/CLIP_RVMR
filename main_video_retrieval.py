@@ -6,7 +6,7 @@ import json
 
 from utils.utils_model import prep_optimizer, save_model, load_model
 from utils.setup import get_args, set_seed_logger
-from utils.utils import LossTracker, TimeTracker
+from utils.utils import LossTracker, TimeTracker, save_json
 
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
@@ -45,7 +45,9 @@ def main():
         train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video_CLIP(args, processor)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
+    # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size * len(train_dataloader), gamma=args.lr_gamma)
 
     best_score = -1.0
     time_tracker = TimeTracker()
@@ -59,7 +61,7 @@ def main():
             step += 1
             time_tracker.stop("grab_data")
             time_tracker.start("to_device")
-            batch_data = [b.to(device) for b in batch_data]
+            batch_data = [b.to(device, non_blocking=True) for b in batch_data]
             text_ids, text_masks, videos, video_masks = batch_data
             optimizer.zero_grad()
             time_tracker.stop("to_device")
@@ -73,6 +75,8 @@ def main():
                 loss = loss.mean()  # Apply reduction to make it a scalar
             loss.backward()
             optimizer.step()
+            scheduler.step()
+            
             time_tracker.stop("backward")
             time_tracker.start("grab_data")
             epoch_loss_tracker.update(loss.item())
@@ -110,7 +114,6 @@ def main():
                     save_model(args, model, optimizer, suffix="best", logger=logger)
                     logger.info(f"BEST VAL  Recall@{first_topk}: {val_recalls[first_topk]:.4f}")
                     logger.info(f"BEST TEST Recall@{first_topk}: {test_recalls[first_topk]:.4f}")
-        scheduler.step()
 
 if __name__ == "__main__":
     main()

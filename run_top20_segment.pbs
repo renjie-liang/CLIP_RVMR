@@ -3,10 +3,10 @@
 ## Job Name
 #PBS -N clip_rvmr
 
-## Project Funding Code E,g. eee_userid
+## Project Funding Code E.g. eee_userid
 #PBS -P gs_slab
 
-## Queue  Name
+## Queue Name
 #PBS -q slab_gpu8
 
 ## By default error and output files are in format  <job_name>.e<JOB_ID> and <job_name>.o<JOB_ID>.
@@ -17,20 +17,18 @@
 ## Specify walltime in HH:MM:SS
 #PBS -l walltime=120:00:00
 
-## Select 1 hosts (nodes) with 32 cores per Host and launch 32 MPI tasks per host
+## Select 1 host (node) with 8 cores per Host and launch 32 MPI tasks per host
 #PBS -l select=1:ncpus=8:ngpus=2
 
 ## OMP_NUM_THREADS
 export OMP_NUM_THREADS=1
 
-
-## Load the Application
-
-
-## pre-processing script
+## Pre-processing script
 cd $PBS_O_WORKDIR
 
-## Capture Number of Cores
-nprocs=`cat $PBS_NODEFILE|wc -l`
+nprocs=$(cat $PBS_NODEFILE | wc -l)
 
-conda run -n py11 sh run_top20_segment.sh
+## Activate conda environment and run the script
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate py11
+sh run_top20_segment.sh

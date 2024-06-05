@@ -35,14 +35,16 @@ class BaseDataset(Dataset):
         
         # Filter frames by start_frame and end_frame if specified
         if start_frame is not None and end_frame is not None:
-            total_frames = len(frame_files)
-            end_frame = min(end_frame, total_frames)
-            frame_files = frame_files[int(start_frame):int(end_frame)]
+            end_frame = min(end_frame, len(frame_files))
+            frame_files_seg = frame_files[int(start_frame):int(end_frame)]
         # Calculate step size to select num_frames frames
-        step = max(1, len(frame_files) // num_frames)
-        selected_frames = frame_files[::step][:num_frames]
-
+        step = max(1, len(frame_files_seg) // num_frames)
+        selected_frames = frame_files_seg[::step][:num_frames]
+        # keep at least one frame the in input
+        if len(selected_frames) == 0:
+            selected_frames = frame_files[:1]
         # Read and convert frames to tensors
+        
         frames = []
         for frame_file in selected_frames:
             frame = cv2.imread(os.path.join(frame_path, frame_file))
@@ -69,10 +71,7 @@ class BaseDataset(Dataset):
         frames = self._extract_frames(frame_path, self.max_frame_count, start_frame, end_frame)
         
         
-        if len(frames) == 0:
-            print("0 frames:", video_name, segment_idx)
-            print("0 frames:", video_name, segment_idx)
-            print("0 frames:", video_name, segment_idx)
+
             # Create a mask indicating valid frames
         video_mask = [1] * len(frames) + [0] * (self.max_frame_count - len(frames))
         video_mask = torch.tensor(video_mask, dtype=torch.long)
