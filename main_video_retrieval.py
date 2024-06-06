@@ -46,8 +46,8 @@ def main():
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
-    # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size * len(train_dataloader), gamma=args.lr_gamma)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size * len(train_dataloader), gamma=args.lr_gamma)
 
     best_score = -1.0
     time_tracker = TimeTracker()
