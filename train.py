@@ -23,10 +23,8 @@ def main():
     args = get_args()
     logger = set_seed_logger(args)
     logger.info("Arguments:\n%s", json.dumps(vars(args), indent=4))
-    # if args.checkpoint_path is not None:
-    #     logger.info(f"Load model from {args.checkpoint_path}")
-    #     model = load_model(args, args.checkpoint_path)
-    #         # checkpoint = torch.load(args.resume_model, map_location='cpu')
+    
+
     model = CLIPFineTuner(args.clip_model_name)
     model.freeze_layers(freeze_layer_count=args.freeze_layer_num)
     processor = CLIPProcessor.from_pretrained(args.clip_model_name)
@@ -49,12 +47,18 @@ def main():
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
     # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size * len(train_dataloader), gamma=args.lr_gamma)
 
+    if args.checkpoint_path is not None:
+        model, optimizer  = load_model(model, args.checkpoint_path, optimizer,  args.optimizer_path)
+        logger.info(f"Load model from {args.checkpoint_path}")
+        logger.info(f"Load optimizer from {args.optimizer_path}")
+
     best_score = -1.0
     time_tracker = TimeTracker()
     epoch_loss_tracker = LossTracker()
     
-    model.train()
     for epoch in range(args.num_epochs):
+        model.train()
+            
         # torch.cuda.empty_cache()
         time_tracker.start("grab_data")
         for step, batch_data in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
@@ -101,6 +105,7 @@ def main():
                 # Assuming eval_epoch returns a dictionary with recall values for each topk
                 val_recalls = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
                 test_recalls = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
+                model.train()
 
                 # Log each recall value for the given topk values
                 for topk in args.recall_topk:

@@ -17,12 +17,17 @@ def save_model(args, model, optimizer, suffix, logger):
     return output_model_file
 
 
-def load_model(args, model_file):
-    model_state_dict = torch.load(model_file, map_location='cpu')
-    cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-    print(f"cache_dir: {cache_dir}")
-    model = CLIP4Clip.from_pretrained(args, cache_dir=cache_dir, state_dict=model_state_dict)
-    return model
+def load_model(model, ckpt_path, optimizer=None, optimizer_path=None):
+    state_dict = torch.load(ckpt_path)
+    if hasattr(model, 'module'):
+        model.module.load_state_dict(state_dict)
+    else:
+        model.load_state_dict(state_dict)
+    
+    optimizer_data = torch.load(optimizer_path)
+    optimizer.load_state_dict(optimizer_data)
+    return model, optimizer
+
 
 def prep_optimizer(args, model, num_train_optimization_steps, logger):
 

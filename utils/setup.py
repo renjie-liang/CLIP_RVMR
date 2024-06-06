@@ -18,8 +18,8 @@ def get_args(description='CLIP4Clip on Retrieval Task'):
     parser.add_argument("--video_dir", type=str, required=True, help="Directory containing video frames")
     parser.add_argument("--corpus_path", type=str, required=True, help="Path to the video corpus JSON")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory to save outputs")
-    # parser.add_argument("--checkpoint_path", type=str, help="Path to save model checkpoints")
-    # parser.add_argument("--optimizer_path", type=str, help="Path to save optimizer state")
+    parser.add_argument("--checkpoint_path", type=str, help="Path to save model checkpoints")
+    parser.add_argument("--optimizer_path", type=str, help="Path to save optimizer state")
 
     # Experiment settings
     parser.add_argument("--experiment_remark", type=str, help="Remarks for the current experiment")

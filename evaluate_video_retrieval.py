@@ -17,9 +17,9 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             
             all_video_features.append(visual_output)
             all_video_masks.append(video_masks)
-            # n += 1
-            # if n > 30:
-            #     break
+            n += 1
+            if n > 50:
+                break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
         all_video_masks = torch.cat(all_video_masks, dim=0)
@@ -28,6 +28,7 @@ def grab_corpus_feature(model, corpus_dataloader, device):
 def eval_epoch(model, eval_dataloader, corpus_feature, device, ground_truth, corpus_videos, topk):
     all_video_features, all_video_masks = corpus_feature
     all_text_features = []
+    model.eval()
     with torch.no_grad():
         # Process text features
         for batch in tqdm(eval_dataloader, desc="Get Texts Feature"):
@@ -60,6 +61,35 @@ def calculate_recall_topk(model, all_text_features, all_video_features, all_vide
     simi_matrix = simi_matrix.cpu().detach().numpy()
     recalls_dict = {topk: [] for topk in topks}
 
+    for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
+        simi = simi_matrix[text_idx]
+        gt_videos = ground_truth[text_idx]
+        # Calculate recall
+        for topk in topks:
+            # Get top N similar video indices
+            top_n_indices = np.argsort(-simi)[:topk]
+            top_n_video_names = [corpus_videos[i] for i in top_n_indices]
+            # Calculate recall
+            recall = sum(1 for gt in gt_videos if gt in top_n_video_names) / len(gt_videos)
+            recalls_dict[topk].append(recall)
+
+    # Calculate the average recall for each topk
+    average_recalls = {topk: np.mean(recalls) for topk, recalls in recalls_dict.items()}
+    
+    return average_recalls
+
+
+
+def calculate_NDCG(model, all_text_features, all_video_features, all_video_masks, topks, ground_truth, corpus_videos):
+    all_text_features = all_text_features.squeeze(1)
+    all_text_features = all_text_features.contiguous()
+    all_video_features = all_video_features.contiguous()
+    # Calculate similarities in a batch
+    simi_matrix = model.module.compute_similarity_matrix(all_text_features, all_video_features, all_video_masks)
+    simi_matrix = simi_matrix.cpu().detach().numpy()
+    recalls_dict = {topk: [] for topk in topks}
+    result = []
+    
     for text_idx in tqdm(range(simi_matrix.shape[0]), desc="Calculate the Recall"):
         simi = simi_matrix[text_idx]
         gt_videos = ground_truth[text_idx]
