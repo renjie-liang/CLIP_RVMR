@@ -61,8 +61,8 @@ def grab_pred_moments(pred_results):
             
             segment_info = {
                 "video_name": video_name,
-                "start_time": start,
-                "end_time": end,
+                "start_time": start-2,
+                "end_time": end+2,
                 "model_scores": score,
             }
             
@@ -74,7 +74,7 @@ def grab_pred_moments(pred_results):
 KS = [10, 20, 40]
 TS = [0.3, 0.5, 0.7]
 
-pred_result = torch.load("pred_result_val.pt")
+pred_result = torch.load("/home/share/rjliang/pred_result_val.pt")
 gt_moments_all = grab_gt_moments(pred_result)
 pred_moments_all = grab_pred_moments(pred_result)
 average_ndcg = recall_iou_ndcg(gt_moments_all, pred_moments_all , TS, KS)
