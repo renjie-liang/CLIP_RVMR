@@ -4,13 +4,12 @@ import torch.nn as nn
 from tqdm import tqdm
 import json
 
-from utils.utils_model import prep_optimizer, save_model, load_model
+from utils.utils_model import save_model, load_model
 from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker, save_json
 
-from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
-from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
+from modules.evaluate_lib import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
 from transformers import CLIPProcessor, CLIPModel

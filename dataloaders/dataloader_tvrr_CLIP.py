@@ -216,7 +216,8 @@ class EvalSegmentDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
         self.annotations = load_jsonl(annotation_path)
-        self.ground_truth = self.generate_gt()
+        self.segment_retrieval_gt = self.get_segment_retrieval_gt()
+        self.relevant_moment_gt = self.get_relevant_moment_gt()
         
     def __len__(self):
         return len(self.annotations)
@@ -226,7 +227,7 @@ class EvalSegmentDataset(BaseDataset):
         text = anno["query"]
         return text
     
-    def generate_gt(self):
+    def get_segment_retrieval_gt(self):
         gt_all = []
         for record in self.annotations:
             gt_per_query = []
@@ -245,4 +246,13 @@ class EvalSegmentDataset(BaseDataset):
                 segment_name = video_name + "_" + str(segment_idx)
                 gt_per_query.append(segment_name)
             gt_all.append(gt_per_query)
+        return gt_all
+
+
+    def get_relevant_moment_gt(self):
+        gt_all = []
+        for record in self.annotations:
+            gt_all.append({
+                "query_id": record["query_id"],
+                "relevant_moment": record["relevant_moment"]})
         return gt_all

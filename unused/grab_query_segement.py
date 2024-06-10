@@ -2,8 +2,8 @@ import pandas as pd
 import math
 from utils.utils import load_jsonl, save_jsonl
 
-input_path = "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/test.jsonl"
-output_path = "data/TVR_Ranking_Segment/test_segment.jsonl"
+input_path = "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl"
+output_path = "data/TVR_Ranking_Segment/val_segment.jsonl"
 
 def split_into_segments(relevant_moments):
     segments = []
@@ -40,7 +40,7 @@ for item in in_data:
     query_id = item['query_id']
     
     relevant_segments = split_into_segments(item['relevant_moment'])
-    processed_data.append({"query": query, "query_id": query_id, "relevant_segment": relevant_segments})
+    processed_data.append({"query": query, "query_id": query_id, "relevant_moment": item['relevant_moment'],  "relevant_segment": relevant_segments})
 
 save_jsonl(processed_data, output_path)
 print(f"Processed data saved to {output_path}")

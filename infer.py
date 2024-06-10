@@ -4,11 +4,10 @@ import torch.nn as nn
 from tqdm import tqdm
 import json
 
-from utils.utils_model import prep_optimizer, save_model, load_model
+from utils.utils_model import  save_model, load_model
 from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker, save_json
 
-from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
 from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
@@ -37,7 +36,10 @@ def main():
         device = torch.device("cpu")
         model.to(device)
 
-    train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_segment_CLIP(args, processor)
+    train_dataloader, corpus_dataloader, corpus_video_list, val_dataset, val_dataloader, test_dataset, test_dataloader  = prepare_dataloader_segment_CLIP(args, processor)
+
+    
+
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
@@ -50,13 +52,14 @@ def main():
     
     model.eval()
     corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
-    val_recalls = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
-    test_recalls = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
+    val_recalls = eval_epoch(model, val_dataset, val_dataloader, corpus_feature, device, corpus_video_list, args.recall_topk, "val")
+    # test_recalls = eval_epoch(model, test_dataset, test_dataloader, corpus_feature, device, corpus_video_list, args.recall_topk, "test")
+
 
     # Log each recall value for the given topk values
     for topk in args.recall_topk:
         logger.info(f"VAL  Recall@{topk}: {val_recalls[topk]:.4f}")
-        logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
+        # logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
 
 
 

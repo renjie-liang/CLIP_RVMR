@@ -86,14 +86,11 @@ def prepare_dataloader_segment_CLIP(args, processor):
     
     val_dataset = EvalSegmentDataset(annotation_path=args.val_path, args=args)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='eval'))
-    val_ground_truth = val_dataset.ground_truth
     
     test_dataset = EvalSegmentDataset(annotation_path=args.test_path, args=args)
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='eval'))
-    test_ground_truth = test_dataset.ground_truth
     
     # return train_dataloader, corpus_dataloader, corpus_video_list, None, None, None, None
-    return train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_ground_truth, test_dataloader, test_ground_truth
-
+    return train_dataloader, corpus_dataloader, corpus_video_list, val_dataset, val_dataloader, test_dataset, test_dataloader
 
 
