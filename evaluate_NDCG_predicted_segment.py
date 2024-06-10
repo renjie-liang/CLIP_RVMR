@@ -26,7 +26,7 @@ def grab_pred_moments(pred_results):
 
     Args:
         pred_results (list): A list of dictionaries where each dictionary contains:
-            - predicted_seg_name (list of str): List of segment names (e.g., ["video1_0", "video1_1", ...])
+            - predicted_seg_name (list of str): List of segment names (e.g., ["video1_segidx0", "video1_segidx1", ...])
             - predicted_seg_score (list of float): List of scores corresponding to each segment.
             - query_id (str): The query identifier.
 

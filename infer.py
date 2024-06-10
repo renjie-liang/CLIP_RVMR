@@ -9,7 +9,7 @@ from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker, save_json
 
 from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
-from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
+from modules.evaluate_lib import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
 from transformers import CLIPProcessor, CLIPModel
