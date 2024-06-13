@@ -20,26 +20,47 @@ def init_logit(video_corpus):
         res[video_name] = np.zeros(math.ceil(duration))
     return res
 
-
 def plot_save(video_name, videos_pred, videos_gt, output_dir, i):
+    """
+    Generates and saves a plot comparing prediction scores and ground truth scores for a given video.
 
-    y1 = videos_pred[video_name]
-    y2 = videos_gt[video_name]
+    Args:
+        video_name (str): The name of the video.
+        videos_pred (dict): A dictionary where keys are video names and values are lists of prediction scores.
+        videos_gt (dict): A dictionary where keys are video names and values are tuples. Each tuple contains a list of ground truth scores and a relevance score.
+        output_dir (str): The directory where the plot will be saved.
+        i (int): An index used for naming the output file.
+
+    Returns:
+        None
+    """
+    # Extract prediction scores and ground truth data
+    x1 = videos_pred[video_name]
+    x2, relevance = videos_gt[video_name]
     
-    # Create a plot
+    # Create a plot for prediction scores
     plt.figure()
-    plt.plot(y1, label="Prediction Score")
-    plt.plot(y2, [0, 0], label="Ground Truth", marker='o', color="red")
+    plt.plot(x1, label="Prediction Score")
     plt.ylim(-10, 30)
     plt.title(video_name)
     plt.legend()
     plt.xlabel("Video (second)")
     plt.ylabel("Similarity Score")
     
+    # Create a secondary y-axis for relevance level
+    ax = plt.gca()
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Relevance Level")
+    ax2.plot(x2, [relevance, relevance], label="Ground Truth", marker='o', color="red")
+    ax2.text((x2[0] + x2[1]) / 2, relevance + 0.2, str(relevance), ha='center', va='bottom')
+    ax2.set_ylim(-2, 6)  # Adjusted to reflect relevance level range
+    
+    # Save the plot
     output_file = os.path.join(output_dir, f'{i}_{video_name}.jpg')
     plt.savefig(output_file, dpi=300)
     print(f'Plot saved to {output_file}')
     plt.close()
+
 
 
     
@@ -61,13 +82,12 @@ for pred in pred_result[:30]:
         end = (seg_idx + 1)* seg_duration
         videos_pred[video_name][start:end] = score
         
-        videos_gt[video_name] = [0,0]
+        videos_gt[video_name] = [[0,0], 0]
     
     relevant_moment = pred["relevant_moment"]
     for i in relevant_moment:
         video_name = i["video_name"]
-        timestamp = i["timestamp"]
-        videos_gt[video_name]= i["timestamp"]
+        videos_gt[video_name]= [i["timestamp"], i["relevance"]]
     
         
 

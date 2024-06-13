@@ -1,9 +1,9 @@
 import pandas as pd
 import math
-from utils.utils import load_jsonl, save_jsonl
+from utils.utils import load_json, save_json
 
-input_path = "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl"
-output_path = "data/TVR_Ranking_Segment/val_segment.jsonl"
+input_path = "/home/share/rjliang/TVR_Ranking/train_top20.json"
+output_path = "data/TVR_Ranking_Segment/train_top20_segment.json"
 
 def split_into_segments(relevant_moments):
     segments = []
@@ -11,7 +11,7 @@ def split_into_segments(relevant_moments):
         video_name = moment['video_name']
         start_time, end_time = moment['timestamp']
         duration = moment['duration']
-        relevance = moment['relevance']
+        # relevance = moment['relevance']
         
         similarity = round(moment['similarity'], 4)
 
@@ -26,13 +26,12 @@ def split_into_segments(relevant_moments):
                     "video_name": video_name,
                     "duration": duration,
                     "segment_idx": segment_idx,
-                    "moment_timestamp": [start_time, end_time],
                     "similarity": similarity,
-                    "relevance": relevance,
+                    # "relevance": relevance,
                 })
     return segments
 
-in_data = load_jsonl(input_path)
+in_data = load_json(input_path)
 processed_data = []
 
 for item in in_data:
@@ -40,7 +39,7 @@ for item in in_data:
     query_id = item['query_id']
     
     relevant_segments = split_into_segments(item['relevant_moment'])
-    processed_data.append({"query": query, "query_id": query_id, "relevant_moment": item['relevant_moment'],  "relevant_segment": relevant_segments})
+    processed_data.append({"query": query, "query_id": query_id,  "relevant_segment": relevant_segments, "relevant_moment": item['relevant_moment']})
 
-save_jsonl(processed_data, output_path)
+save_json(processed_data, output_path)
 print(f"Processed data saved to {output_path}")

@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import torch
 import cv2
-from utils.utils import load_jsonl, load_json
+from utils.utils import load_json, load_json
 
 class BaseDataset(Dataset):
     def __init__(self, args):
@@ -84,7 +84,7 @@ class BaseDataset(Dataset):
 class TrainVideoDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
-        self.annotations = load_jsonl(annotation_path)
+        self.annotations = load_json(annotation_path)
         self.annotations = self.expand_annotations(self.annotations)
 
     def __len__(self):
@@ -128,7 +128,7 @@ class CorpusVideoDataset(BaseDataset):
 class EvalVideoDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
-        self.annotations = load_jsonl(annotation_path)
+        self.annotations = load_json(annotation_path)
         self.ground_truth = self.generate_gt()
         
     def __len__(self):
@@ -159,7 +159,7 @@ class EvalVideoDataset(BaseDataset):
 class TrainSegmentDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
-        self.annotations = load_jsonl(annotation_path)
+        self.annotations = load_json(annotation_path)
         self.annotations = self.expand_annotations(self.annotations)
 
         self.segment_second = args.segment_second
@@ -194,7 +194,7 @@ class TrainSegmentDataset(BaseDataset):
 class CorpusSegmentDataset(BaseDataset):
     def __init__(self, corpus_path, args):
         super().__init__(args)
-        self.corpus = load_jsonl(corpus_path)
+        self.corpus = load_json(corpus_path)
         self.corpus_segment_list = [i["video_name"] + "_" + str(i["segment_idx"]) for i in self.corpus]
         self.segment_second = args.segment_second
         self.fps = args.fps
@@ -215,7 +215,7 @@ class CorpusSegmentDataset(BaseDataset):
 class EvalSegmentDataset(BaseDataset):
     def __init__(self, annotation_path, args):
         super().__init__(args)
-        self.annotations = load_jsonl(annotation_path)
+        self.annotations = load_json(annotation_path)
         self.segment_retrieval_gt = self.get_segment_retrieval_gt()
         self.relevant_moment_gt = self.get_relevant_moment_gt()
         

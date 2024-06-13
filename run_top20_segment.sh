@@ -1,8 +1,8 @@
 python train.py \
-    --train_path    data/TVR_Ranking_Segment/train_top20_segment.jsonl \
-    --val_path      data/TVR_Ranking_Segment/val_segment.jsonl \
-    --test_path     data/TVR_Ranking_Segment/test_segment.jsonl \
-    --corpus_path   data/TVR_Ranking_Segment/segment_corpus_4seconds.jsonl \
+    --train_path    /home/share/rjliang/TVR_Ranking_Segment/train_top20_segment.json \
+    --val_path      /home/share/rjliang/TVR_Ranking_Segment/val_segment.json \
+    --test_path     /home/share/rjliang/TVR_Ranking_Segment/test_segment.json \
+    --corpus_path   /home/share/rjliang/TVR_Ranking_Segment/segment_corpus_4seconds.json \
     --video_dir     /home/share/rjliang/Dataset/TVR/frames \
     --output_dir    result/tvrr_segment_top20 \
     --data_name     query_segment \

@@ -1,8 +1,8 @@
 python main_video_retrieval.py \
-    --train_path    /home/share/rjliang/Dataset/TVR_Ranking_v3/train_top20.jsonl \
-    --val_path      /home/share/rjliang/Dataset/TVR_Ranking_v3/val.jsonl \
-    --test_path     /home/share/rjliang/Dataset/TVR_Ranking_v3/test.jsonl \
-    --corpus_path   /home/share/rjliang/Dataset/TVR_Ranking_v3/video_corpus.json \
+    --train_path    /home/share/rjliang/TVR_Ranking/train_top20.json \
+    --val_path      /home/share/rjliang/TVR_Ranking/val.json \
+    --test_path     /home/share/rjliang/TVR_Ranking/test.json \
+    --corpus_path   /home/share/rjliang/TVR_Ranking/video_corpus.json \
     --video_dir     /home/share/rjliang/Dataset/TVR/frames \
     --output_dir    result/tvrr_video_query_top20 \
     --data_name     query_video_clip \
