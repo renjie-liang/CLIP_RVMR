@@ -8,8 +8,8 @@ from utils.utils import get_logger
 
 import argparse
 
-def get_args(description='CLIP4Clip on Retrieval Task'):
-    parser = argparse.ArgumentParser(description=description)
+def get_args():
+    parser = argparse.ArgumentParser()
     
     # Paths
     parser.add_argument("--train_path", type=str, required=True, help="Path to the training dataset")

@@ -21,48 +21,45 @@ def calculate_ndcg(pred_scores, true_scores):
     idcg = calculate_dcg(sorted(true_scores, reverse=True))
     return dcg / idcg if idcg > 0 else 0
 
-def recall_iou_ndcg(gt_data, pred_data, TS, KS):
+
+
+def calculate_ndcg_iou(all_gt, all_pred, TS, KS):
     performance = defaultdict(lambda: defaultdict(list))
     performance_avg = defaultdict(lambda: defaultdict(float))
-    
-    for query_id, one_query_preds in tqdm(pred_data.items()):
-        one_query_gts = gt_data[query_id]
         
-        one_query_preds_df = pd.DataFrame(one_query_preds, columns=["video_name", "start_time", "end_time", "model_scores"])
-        one_query_gts_df =  pd.DataFrame(one_query_gts, columns=["video_name", "timestamp", "relevance", "duration"])
-        one_query_gts_df["start_time"] = one_query_gts_df["timestamp"].apply(lambda x: x[0])
-        one_query_gts_df["end_time"] = one_query_gts_df["timestamp"].apply(lambda x: x[1])
-        one_query_gts_df = one_query_gts_df.sort_values(by="relevance", ascending=False).reset_index(drop=True)
+    for query_id in tqdm(all_pred.keys(), desc="Calculate NDCG,IoU: "):
+    # for i in trange(len(all_pred)):
+        one_pred = all_pred[query_id]
+        one_gt = all_gt[query_id]
+        one_gt.sort(key=lambda x: x["relevance"], reverse=True)
 
         for T in TS:
-            one_query_gts_drop = one_query_gts_df.copy()
+            one_gt_drop = one_gt.copy()
             predictions_with_scores = []
-            for index, pred in one_query_preds_df.iterrows():
-                pred_video_name, pred_st, pred_ed = pred["video_name"], pred["start_time"], pred["end_time"]
-                matched_rows = one_query_gts_drop[one_query_gts_drop["video_name"] == pred_video_name].reset_index(drop=True)
-                
-                if matched_rows.empty:
+            
+            for pred in one_pred:
+                pred_video_name, pred_time = pred["video_name"], pred["timestamp"]
+                matched_rows = [gt for gt in one_gt_drop if gt["video_name"] == pred_video_name]
+                if not matched_rows:
                     pred["pred_relevance"] = 0
                 else:
-                    matched_rows["iou"] = matched_rows.apply(lambda row: calculate_iou(pred_st, pred_ed, row["start_time"], row["end_time"]), axis=1)
-                    max_iou_idx = matched_rows["iou"].idxmax()
-                    max_iou_row = matched_rows.iloc[max_iou_idx]
+                    ious = [calculate_iou(pred_time[0], pred_time[1], gt["timestamp"][0], gt["timestamp"][1]) for gt in matched_rows]
+                    max_iou_idx = np.argmax(ious)
+                    max_iou_row = matched_rows[max_iou_idx]
                     
-                    if max_iou_row["iou"] > T:
+                    if ious[max_iou_idx] > T:
                         pred["pred_relevance"] = max_iou_row["relevance"]
                         # Remove the matched ground truth row
-                        one_query_gts_drop = one_query_gts_drop.drop(index=matched_rows.index[max_iou_idx]).reset_index(drop=True)
+                        original_idx = one_gt_drop.index(max_iou_row)
+                        one_gt_drop.pop(original_idx)
                     else:
                         pred["pred_relevance"] = 0
-                
                 predictions_with_scores.append(pred)
-            predictions_with_scores = pd.DataFrame(predictions_with_scores)
             for K in KS:
-                true_scores = one_query_gts_df["relevance"].tolist()[:K]
-                pred_scores = predictions_with_scores["pred_relevance"].tolist()[:K]
+                true_scores = [gt["relevance"] for gt in one_gt][:K]
+                pred_scores = [pred["pred_relevance"] for pred in predictions_with_scores][:K]
                 ndcg_score = calculate_ndcg(pred_scores, true_scores)
                 performance[K][T].append(ndcg_score)
-
     for K, vs in performance.items():
         for T, v in vs.items():
             performance_avg[K][T] = np.mean(v)

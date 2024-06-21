@@ -4,7 +4,7 @@ import numpy as np
 import math
 import os
 import matplotlib.pyplot as plt
-from  utils.ndcg_iou import recall_iou_ndcg
+from  utils.ndcg_iou import calculate_ndcg_iou
 from tqdm import tqdm
 
 
@@ -60,9 +60,8 @@ def grab_pred_moments(pred_results):
             end = (seg_idx + 1) * seg_duration
             
             segment_info = {
+                "timestamp": [start-2, end+2],
                 "video_name": video_name,
-                "start_time": start-2,
-                "end_time": end+2,
                 "model_scores": score,
             }
             
@@ -77,7 +76,7 @@ TS = [0.3, 0.5, 0.7]
 pred_result = torch.load("/home/share/rjliang/pred_result_val.pt")
 gt_moments_all = grab_gt_moments(pred_result)
 pred_moments_all = grab_pred_moments(pred_result)
-average_ndcg = recall_iou_ndcg(gt_moments_all, pred_moments_all , TS, KS)
+average_ndcg = calculate_ndcg_iou(gt_moments_all, pred_moments_all , TS, KS)
 for K, vs in average_ndcg.items():
     for T, v in vs.items():
         print(f"VAL Top {K}, IoU={T}, NDCG: {v:.6f}")
