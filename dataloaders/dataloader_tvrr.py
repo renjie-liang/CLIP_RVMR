@@ -258,3 +258,5 @@ class EvalSegmentDataset(BaseDataset):
                 "query_id": record["query_id"],
                 "relevant_moment": record["relevant_moment"]})
         return gt_all
+    
+    

@@ -25,11 +25,7 @@ def main():
     
 
     model = CLIPFineTuner(args.clip_model_name)
-<<<<<<< HEAD:main_video_retrieval.py
-    model.freeze_layers(freeze_layer_count=args.freeze_layer_count)
-=======
     model.freeze_layers(freeze_layer_count=args.freeze_layer_num)
->>>>>>> single_gpu:train.py
     processor = CLIPProcessor.from_pretrained(args.clip_model_name)
     
     if torch.cuda.is_available():
@@ -102,14 +98,6 @@ def main():
             if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
             # if step % 1 == 0 or step % len(train_dataloader) == 0:
                 corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
-<<<<<<< HEAD:main_video_retrieval.py
-                val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
-                test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
-                
-                logger.info("")
-                logger.info(f"VAL  Recall@{args.recall_topk}: {val_recall:.4f}")
-                logger.info(f"TEST Recall@{args.recall_topk}: {test_recall:.4f}\n")
-=======
                 # Assuming eval_epoch returns a dictionary with recall values for each topk
                 val_recalls = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
                 test_recalls = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
@@ -119,7 +107,6 @@ def main():
                 for topk in args.recall_topk:
                     logger.info(f"VAL  Recall@{topk}: {val_recalls[topk]:.4f}")
                     logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
->>>>>>> single_gpu:train.py
 
                 # Use the first topk value as the criterion for best score
                 first_topk = args.recall_topk[0]

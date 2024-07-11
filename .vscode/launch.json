@@ -32,5 +32,5 @@
                 "--freeze_layer_count", "10",
                 "--read_video_from_tensor"
             ],
-    ]
+    }
 }

@@ -1,5 +1,5 @@
 import torch
-from utils.utils import load_json
+from utils.utils import load_json, save_json
 import numpy as np
 import math
 from tqdm import tqdm
@@ -74,7 +74,7 @@ def find_clip(top_video_simi, threshold):
                 start, end = segment
                 avg_score = average(vs[start:end+1])
                 segment_info = {
-                    "timestamp": [start-1, end+1],
+                    "timestamp": [start, end],
                     "video_name": video_name,
                     "model_scores": avg_score,
                 }
@@ -92,12 +92,13 @@ all_pred_result = torch.load("/home/share/rjliang/pred_result_val.pt")
 video_corpus = load_json("/home/share/rjliang/TVR_Ranking/video_corpus.json")
 new_pred_result_name = "/home/share/rjliang/pred_result_val_video_simi.npy"
 all_pred_result_video_simi = np.load(new_pred_result_name, allow_pickle=True).item()
-
+coarse_pred_path = "coarse_prediction.json"
 
 topn_video = 100
 # top_video_simi = {"query_id": {"video_name1": 1*L1, "video_name2": 1*L2}}
 top_video_simi = top_video_similarity(all_pred_result, all_pred_result_video_simi, topn_video)
 pred_moments_all = find_clip(top_video_simi, SIMI_THRESHOLD)
+save_json(pred_moments_all, coarse_pred_path)
 
 gt_moments_all = grab_gt_moments(all_pred_result)
 average_ndcg = calculate_ndcg_iou(gt_moments_all, pred_moments_all , TS, KS)
@@ -105,3 +106,13 @@ for K, vs in average_ndcg.items():
     for T, v in vs.items():
         print(f"VAL NDCG@{K}, IoU={T}: {v:.6f}")
 
+
+# VAL NDCG@10, IoU=0.3: 0.324609
+# VAL NDCG@10, IoU=0.5: 0.228848
+# VAL NDCG@10, IoU=0.7: 0.130436
+# VAL NDCG@20, IoU=0.3: 0.325891
+# VAL NDCG@20, IoU=0.5: 0.229423
+# VAL NDCG@20, IoU=0.7: 0.128963
+# VAL NDCG@40, IoU=0.3: 0.352268
+# VAL NDCG@40, IoU=0.5: 0.246940
+# VAL NDCG@40, IoU=0.7: 0.137279

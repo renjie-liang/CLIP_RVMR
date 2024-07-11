@@ -1,6 +1,6 @@
 import torch, os
 import torch.nn as nn
-
+from modules.ReLoCLNet import ReLoCLNet
 
 def save_model(args, model, optimizer, suffix, logger):
     model_to_save = model.module if hasattr(model, 'module') else model
@@ -25,6 +25,28 @@ def load_model(model, ckpt_path, optimizer=None, optimizer_path=None):
     optimizer.load_state_dict(optimizer_data)
     return model, optimizer
 
+def prepare_ReLoCLNet(opt, logger):
+    model = ReLoCLNet(opt)
+    if opt.device.type == "cuda":
+        logger.info("CUDA enabled.")
+        model.to(opt.device)
+    return model
+
+def resume_ReLoCLNet(logger, opt, model=None, optimizer=None, start_epoch=None):
+    checkpoint = torch.load(opt.checkpoint, map_location=opt.device)
+    if model is not None:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        logger.info(f"Loading model from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        logger.info(f"Loading optimizer from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+            
+    if start_epoch is not None:
+        start_epoch = checkpoint['epoch']
+        logger.info(f"Loading start_epoch from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        
+    return model, optimizer, start_epoch
 
 # def prep_optimizer(args, model, num_train_optimization_steps, logger):
 
