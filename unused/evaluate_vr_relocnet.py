@@ -1,4 +1,4 @@
-from utils.utils import load_json, load_jsonl
+from utils.utils import load_json
 import numpy as np
 def generate_map(map_path):
     video_map = {}
@@ -10,7 +10,7 @@ def generate_map(map_path):
 
 def generate_gt(annotation_path):
     all_gt = {}
-    annotations = load_jsonl(annotation_path)
+    annotations = load_json(annotation_path)
     for record in annotations:
         query_id = record["query_id"]
         
@@ -27,9 +27,9 @@ def generate_gt(annotation_path):
     return all_gt
 
 
-test_gt = generate_gt("/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/val.jsonl")
+test_gt = generate_gt("/home/share/rjliang//TVR_Ranking/test.json")
     
-test_path = "result/ReLocNet/best_val_predictions.json"
+test_path = "result/ReLocNet/best_test_predictions.json"
 test_prediction = load_json(test_path)
 
 video_map = generate_map("result/ReLocNet/video_name_duration_id.json")
@@ -46,9 +46,7 @@ for record in test_prediction:
         tmp.append(video_name)
     test_vr_pred[query_id] = tmp
 
-
-
-topk = 100
+topk = 20
 recalls = []
 
 for text_idx, preds in test_vr_pred.items():

@@ -14,7 +14,7 @@ python train.py \
     --seed 2024 \
     --experiment_remark  CosineAnnealingLR
 
-# qsub -I -l select=1:ngpus=2 -P gs_slab -q slab_gpu8
+# qsub -I -l select=1:ngpus=1 -P gs_slab -q slab_gpu8
 # cd /home/renjie.liang/12_RVMR_IR/CLIP_RVMR ; conda activate py11 ; sh run_top20_segment.sh
 
 

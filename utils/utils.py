@@ -107,3 +107,5 @@ class TimeTracker:
     def report(self):
         report = "\n".join([f"{name}: {time:.4f} seconds" for name, time in self.times.items()])
         return report
+
+

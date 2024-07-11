@@ -12,9 +12,7 @@ python main_video_retrieval.py \
     --step_log=100 --step_eval=2000 \
     --max_words 32 --max_frame_count 12 \
     --experiment_remark  unique_video_text
-    
 
 # qsub -I -l select=1:ngpus=1 -P gs_slab -q gpu8
 # cd /home/renjie.liang/12_RVMR_IR/CLIP_RVMR ; conda activate py11 ; sh run_top20_video.sh
-
 # gpu8, slab_gpu8, q32, q64, q64_enri, q128, qintel_wfly, tl-gpu, gpu_a40, gpu_a100

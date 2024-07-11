@@ -2,8 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 # from dataloaders.dataloader_tvrr_retrieval import TVRR_DataLoader_train, TVRR_DataLoader_eval, TVRR_DataLoader_corpus
 # from dataloaders.dataloader_tvrr_segment import TVRR_DataLoader_train_segment, TVRR_DataLoader_corpus_segment
-from dataloaders.dataloader_tvrr_CLIP import TrainVideoDataset, CorpusVideoDataset, EvalVideoDataset
-from dataloaders.dataloader_tvrr_CLIP import TrainSegmentDataset, CorpusSegmentDataset, EvalSegmentDataset
+from dataloaders.dataloader_tvrr import TrainVideoDataset, CorpusVideoDataset, EvalVideoDataset
+from dataloaders.dataloader_tvrr import TrainSegmentDataset, CorpusSegmentDataset, EvalSegmentDataset
 
 
 
@@ -43,11 +43,12 @@ def collate_fn(processor, batch, task='train'):
         # return unique_text_inputs['input_ids'], unique_text_inputs['attention_mask'], unique_video_inputs['pixel_values'], video_masks
     
     elif task == 'corpus':
-        frames, video_masks = zip(*batch)
+        frames, video_masks, segment_names = zip(*batch)
         video_inputs = processor(images=[frame for video in frames for frame in video], return_tensors="pt", padding=True)
         video_inputs['pixel_values'] = video_inputs['pixel_values'].view(len(video_masks), *frames[0].shape)
         video_masks = torch.stack(video_masks)
-        return video_inputs['pixel_values'], video_masks
+        return video_inputs['pixel_values'], video_masks, segment_names
+    
     elif task == 'eval':
         texts = batch
         text_inputs = processor(text=list(texts), return_tensors="pt", padding=True, truncation=True, max_length=77)
@@ -57,9 +58,11 @@ def collate_fn(processor, batch, task='train'):
 
 
 
-def prepare_dataloader_video_CLIP(args, processor):
-    train_dataset = TrainVideoDataset(annotation_path=args.train_path, args=args)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True, collate_fn=lambda batch: collate_fn(processor, batch, task='train'))
+def prepare_dataloader_video(args, processor):
+    train_dataset, train_dataloader = None, None
+    
+    # train_dataset = TrainVideoDataset(annotation_path=args.train_path, args=args)
+    # train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True, collate_fn=lambda batch: collate_fn(processor, batch, task='train'))
 
     corpus_dataset = CorpusVideoDataset(corpus_path=args.corpus_path, args=args)
     corpus_dataloader = DataLoader(corpus_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='corpus'))
@@ -69,15 +72,17 @@ def prepare_dataloader_video_CLIP(args, processor):
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='eval'))
     val_ground_truth = val_dataset.ground_truth
     
-    test_dataset = EvalVideoDataset(annotation_path=args.test_path, args=args)
-    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='eval'))
-    test_ground_truth = test_dataset.ground_truth
+    # test_dataset = EvalVideoDataset(annotation_path=args.test_path, args=args)
+    # test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False, collate_fn=lambda batch: collate_fn(processor, batch, task='eval'))
+    # test_ground_truth = test_dataset.ground_truth
     
-    return train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_ground_truth, test_dataloader, test_ground_truth
+    test_dataset, test_dataloader, test_ground_truth = None, None, None
+    
+    
+    return train_dataloader, corpus_dataloader, corpus_video_list, val_dataset, val_dataloader, test_dataset, test_dataloader
 
 
-
-def prepare_dataloader_segment_CLIP(args, processor):
+def prepare_dataloader_segment(args, processor):
     train_dataset = TrainSegmentDataset(annotation_path=args.train_path, args=args)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True, collate_fn=lambda batch: collate_fn(processor, batch, task='train'))
     corpus_dataset = CorpusSegmentDataset(corpus_path=args.corpus_path, args=args)
@@ -92,5 +97,4 @@ def prepare_dataloader_segment_CLIP(args, processor):
     
     # return train_dataloader, corpus_dataloader, corpus_video_list, None, None, None, None
     return train_dataloader, corpus_dataloader, corpus_video_list, val_dataset, val_dataloader, test_dataset, test_dataloader
-
 

@@ -12,26 +12,26 @@ def get_args():
     parser = argparse.ArgumentParser()
     
     # Paths
-    parser.add_argument("--train_path", type=str, required=True, help="Path to the training dataset")
-    parser.add_argument("--val_path", type=str, required=True, help="Path to the validation dataset")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset")
-    parser.add_argument("--video_dir", type=str, required=True, help="Directory containing video frames")
-    parser.add_argument("--corpus_path", type=str, required=True, help="Path to the video corpus JSON")
-    parser.add_argument("--output_dir", type=str, required=True, help="Directory to save outputs")
+    parser.add_argument("--train_path", type=str, help="Path to the training dataset")
+    parser.add_argument("--val_path", type=str, help="Path to the validation dataset")
+    parser.add_argument("--test_path", type=str, help="Path to the test dataset")
+    parser.add_argument("--video_dir", type=str, help="Directory containing video frames")
+    parser.add_argument("--corpus_path", type=str, help="Path to the video corpus JSON")
+    parser.add_argument("--output_dir", type=str, help="Directory to save outputs")
     parser.add_argument("--checkpoint_path", type=str, help="Path to save model checkpoints")
     parser.add_argument("--optimizer_path", type=str, help="Path to save optimizer state")
 
     # Experiment settings
     parser.add_argument("--experiment_remark", type=str, help="Remarks for the current experiment")
-    parser.add_argument("--data_name", type=str, required=True, help="Name of the dataset")
+    parser.add_argument("--data_name", type=str, help="Name of the dataset")
     parser.add_argument('--debug', action='store_true', help="Enable debug mode")
     parser.add_argument('--recall_topk', type=int, nargs='+', help="Top K recall values (e.g., --recall_topk 100 500 1000)")
 
     # Model and Training parameters
     parser.add_argument('--clip_model_name', type=str, default="openai/clip-vit-base-patch32", help="Name of the CLIP model")
-    parser.add_argument('--learning_rate', type=float, required=True, help="Learning rate for training")
-    parser.add_argument('--lr_step_size', type=int, required=True, help="Step size for learning rate decay")
-    parser.add_argument('--lr_gamma', type=float, required=True, help="Gamma for learning rate decay")
+    parser.add_argument('--learning_rate', type=float, help="Learning rate for training")
+    parser.add_argument('--lr_step_size', type=int, help="Step size for learning rate decay")
+    parser.add_argument('--lr_gamma', type=float, help="Gamma for learning rate decay")
     parser.add_argument('--num_epochs', type=int, default=20, help="Number of epochs to train")
     parser.add_argument('--freeze_layer_num', type=int, default=10, help="Number of layers to freeze in the CLIP model")
     parser.add_argument('--warmup_proportion', type=float, default=0.01, help="Proportion of training for warm-up")
@@ -46,7 +46,7 @@ def get_args():
 
     # Logging and evaluation
     parser.add_argument('--step_log', type=int, default=100, help="Frequency of logging training information")
-    parser.add_argument("--step_eval", type=int, required=True, help="Frequency of evaluation during training")
+    parser.add_argument("--step_eval", type=int, help="Frequency of evaluation during training")
 
     # System settings
     parser.add_argument('--num_workers', type=int, default=16, help="Number of worker threads for data loading")

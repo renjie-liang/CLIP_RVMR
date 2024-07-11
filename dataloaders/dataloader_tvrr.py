@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import torch
 import cv2
-from utils.utils import load_json, load_json
+from utils.utils import load_json
 
 class BaseDataset(Dataset):
     def __init__(self, args):
@@ -36,10 +36,11 @@ class BaseDataset(Dataset):
         # Filter frames by start_frame and end_frame if specified
         if start_frame is not None and end_frame is not None:
             end_frame = min(end_frame, len(frame_files))
-            frame_files_seg = frame_files[int(start_frame):int(end_frame)]
+            frame_files = frame_files[int(start_frame):int(end_frame)]
+            
         # Calculate step size to select num_frames frames
-        step = max(1, len(frame_files_seg) // num_frames)
-        selected_frames = frame_files_seg[::step][:num_frames]
+        step = max(1, len(frame_files) // num_frames)
+        selected_frames = frame_files[::step][:num_frames]
         # keep at least one frame the in input
         if len(selected_frames) == 0:
             selected_frames = frame_files[:1]
@@ -145,9 +146,9 @@ class EvalVideoDataset(BaseDataset):
             one_text_gt = []
             for i in record["relevant_moment"]:
                 video_name = i["video_name"]
-                relevance = i["relevance"]
-                if relevance >= 1:
-                    one_text_gt.append(video_name)
+                # relevance = i["relevance"]
+                # if relevance >= 1:
+                #     one_text_gt.append(video_name)
             if len(one_text_gt) == 0:
                 video_name = record["relevant_moment"][0]["video_name"]
                 one_text_gt.append(video_name)
@@ -206,8 +207,9 @@ class CorpusSegmentDataset(BaseDataset):
         anno = self.corpus[idx]
         video_name = anno["video_name"]
         segment_idx = anno["segment_idx"]
+        segment_name = self.corpus_segment_list[idx]
         frames, frames_mask = self._prepare_segment(video_name, segment_idx, self.segment_second, self.fps)
-        return frames, frames_mask
+        return frames, frames_mask, segment_name
 
 
 

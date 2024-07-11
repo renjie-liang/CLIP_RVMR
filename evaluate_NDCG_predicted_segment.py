@@ -79,6 +79,6 @@ pred_moments_all = grab_pred_moments(pred_result)
 average_ndcg = calculate_ndcg_iou(gt_moments_all, pred_moments_all , TS, KS)
 for K, vs in average_ndcg.items():
     for T, v in vs.items():
-        print(f"VAL Top {K}, IoU={T}, NDCG: {v:.6f}")
+        print(f"VAL NDCG@{K}, IoU={T}: {v:.6f}")
 
 

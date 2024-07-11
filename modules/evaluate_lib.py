@@ -1,15 +1,21 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+import h5py
+
 def grab_corpus_feature(model, corpus_dataloader, device):
+    
+    h5file = "./data/features/segments_clip.h5"
+    hf = h5py.File(h5file, 'w')
+
     all_video_features, all_video_masks = [], []
     model.eval()
     n = 0
     with torch.no_grad():
         # Process video features
         for batch in tqdm(corpus_dataloader, desc="Grab Videos Feature"):
-            batch = [b.to(device) for b in batch]
-            videos, video_masks = batch
+            videos, video_masks = batch[0].to(device), batch[1].to(device)
+            segment_names = batch[2]
             visual_output = model.module.get_video_features(videos)
             # Detach and move to CPU
             visual_output = visual_output.detach().cpu()
@@ -17,12 +23,26 @@ def grab_corpus_feature(model, corpus_dataloader, device):
             
             all_video_features.append(visual_output)
             all_video_masks.append(video_masks)
+            
+            for i in range(len(batch)):
+                seg_name = segment_names[i]
+                vfeat = visual_output[i]
+                vmask = video_masks[i]
+                
+                truncated_vfeat = vfeat[vmask.bool()]
+                # print(vfeat.shape, truncated_vfeat.shape)
+                # print(vmask)
+                # breakpoint()
+                hf.create_dataset(f"{seg_name}", data=truncated_vfeat.numpy())
+                
             # n += 1
             # if n > 50:
             #     break
         # Concatenate all video features and masks
         all_video_features = torch.cat(all_video_features, dim=0)
         all_video_masks = torch.cat(all_video_masks, dim=0)
+    hf.close()
+
     return all_video_features, all_video_masks
 
 def eval_epoch(model, eval_dataset, eval_dataloader, corpus_feature, device, corpus_videos, topk, set_type):
@@ -50,7 +70,34 @@ def eval_epoch(model, eval_dataset, eval_dataloader, corpus_feature, device, cor
     # 2. calculate the similarity
     # ----------------------------------
     average_recall = calculate_recall_topk(model, all_text_features, all_video_features, all_video_masks, topk, segment_retrieval_gt, corpus_videos)
-    average_ndcg = calculate_NDCG(model, all_text_features, all_video_features, all_video_masks, topk, relevant_moment_gt, corpus_videos, set_type)
+    # average_ndcg = calculate_NDCG(model, all_text_features, all_video_features, all_video_masks, topk, relevant_moment_gt, corpus_videos, set_type)
+    
+    return average_recall
+
+
+def eval_video_epoch(model, eval_dataset, eval_dataloader, corpus_feature, device, corpus_videos, topk, set_type):
+    
+    ground_truth = eval_dataset.ground_truth 
+    
+    all_video_features, all_video_masks = corpus_feature
+    all_text_features = []
+    model.eval()
+    with torch.no_grad():
+        # Process text features
+        for batch in tqdm(eval_dataloader, desc="Get Texts Feature"):
+            batch = [b.to(device) for b in batch]
+            text_input_ids, attention_mask = batch
+            text_output = model.module.clip_model.get_text_features(input_ids=text_input_ids, attention_mask=attention_mask)
+            # Detach and move to CPU
+            text_output = text_output.detach().cpu()
+            attention_mask = attention_mask.detach().cpu()
+            all_text_features.append(text_output)
+        # Concatenate all text features and masks
+        all_text_features = torch.cat(all_text_features, dim=0)
+    # ----------------------------------
+    # 2. calculate the similarity
+    # ----------------------------------
+    average_recall = calculate_recall_topk(model, all_text_features, all_video_features, all_video_masks, topk, ground_truth, corpus_videos)
     
     return average_recall
 

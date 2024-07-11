@@ -8,7 +8,7 @@ from utils.utils_model import save_model, load_model
 from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker, save_json
 
-from dataloaders.data_dataloaders import prepare_dataloader_segment_CLIP, prepare_dataloader_video_CLIP
+from dataloaders.data_dataloaders import prepare_dataloader_segment, prepare_dataloader_video
 from modules.evaluate_lib import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
@@ -37,9 +37,9 @@ def main():
         model.to(device)
 
     if args.data_name == "query_segment":
-        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_segment_CLIP(args, processor)
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_segment(args, processor)
     elif args.data_name == "query_video_clip":
-        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video_CLIP(args, processor)
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video(args, processor)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
