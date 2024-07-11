@@ -4,13 +4,12 @@ import torch.nn as nn
 from tqdm import tqdm
 import json
 
-from utils.utils_model import prep_optimizer, save_model, load_model
+from utils.utils_model import save_model, load_model
 from utils.setup import get_args, set_seed_logger
-from utils.utils import LossTracker, TimeTracker
+from utils.utils import LossTracker, TimeTracker, save_json
 
-from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
-from dataloaders.data_dataloaders import prepare_dataloader_video, prepare_dataloader_segment, prepare_dataloader_video_CLIP
-from evaluate_video_retrieval import eval_epoch, grab_corpus_feature
+from dataloaders.data_dataloaders import prepare_dataloader_segment, prepare_dataloader_video
+from modules.evaluate_lib import eval_epoch, grab_corpus_feature
 # from modules.modeling import CLIP4Clip
 import time
 from transformers import CLIPProcessor, CLIPModel
@@ -23,12 +22,14 @@ def main():
     args = get_args()
     logger = set_seed_logger(args)
     logger.info("Arguments:\n%s", json.dumps(vars(args), indent=4))
-    # if args.checkpoint_path is not None:
-    #     logger.info(f"Load model from {args.checkpoint_path}")
-    #     model = load_model(args, args.checkpoint_path)
-    #         # checkpoint = torch.load(args.resume_model, map_location='cpu')
+    
+
     model = CLIPFineTuner(args.clip_model_name)
+<<<<<<< HEAD:main_video_retrieval.py
     model.freeze_layers(freeze_layer_count=args.freeze_layer_count)
+=======
+    model.freeze_layers(freeze_layer_count=args.freeze_layer_num)
+>>>>>>> single_gpu:train.py
     processor = CLIPProcessor.from_pretrained(args.clip_model_name)
     
     if torch.cuda.is_available():
@@ -39,27 +40,32 @@ def main():
         device = torch.device("cpu")
         model.to(device)
 
-    if args.data_name == "tvrr_segment":
-        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_segment(args, tokenizer)
-    elif args.data_name == "tvrr_video":
-        train_dataloader, val_dataloader, test_dataloader, corpus_dataloader, corpus_videos, val_gt, test_gt  = prepare_dataloader_video(args, tokenizer)
+    if args.data_name == "query_segment":
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_segment(args, processor)
     elif args.data_name == "query_video_clip":
-        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video_CLIP(args, processor)
+        train_dataloader, corpus_dataloader, corpus_video_list, val_dataloader, val_gt, test_dataloader, test_gt  = prepare_dataloader_video(args, processor)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= 5 * len(train_dataloader))
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size * len(train_dataloader), gamma=args.lr_gamma)
+
+    if args.checkpoint_path is not None:
+        model, optimizer  = load_model(model, args.checkpoint_path, optimizer,  args.optimizer_path)
+        logger.info(f"Load model from {args.checkpoint_path}")
+        logger.info(f"Load optimizer from {args.optimizer_path}")
 
     best_score = -1.0
     time_tracker = TimeTracker()
     epoch_loss_tracker = LossTracker()
     
-    model.train()
     for epoch in range(args.num_epochs):
+        model.train()
+            
         # torch.cuda.empty_cache()
         time_tracker.start("grab_data")
         for step, batch_data in tqdm(enumerate(train_dataloader), total=len(train_dataloader), desc="TRAIN"):
             step += 1
-            
             time_tracker.stop("grab_data")
             time_tracker.start("to_device")
             batch_data = [b.to(device) for b in batch_data]
@@ -75,6 +81,8 @@ def main():
                 loss = loss.mean()  # Apply reduction to make it a scalar
             loss.backward()
             optimizer.step()
+            scheduler.step()
+            
             time_tracker.stop("backward")
             time_tracker.start("grab_data")
             epoch_loss_tracker.update(loss.item())
@@ -94,19 +102,32 @@ def main():
             if step % args.step_eval == 0 or step % len(train_dataloader) == 0:
             # if step % 1 == 0 or step % len(train_dataloader) == 0:
                 corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
+<<<<<<< HEAD:main_video_retrieval.py
                 val_recall = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
                 test_recall = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
                 
                 logger.info("")
                 logger.info(f"VAL  Recall@{args.recall_topk}: {val_recall:.4f}")
                 logger.info(f"TEST Recall@{args.recall_topk}: {test_recall:.4f}\n")
+=======
+                # Assuming eval_epoch returns a dictionary with recall values for each topk
+                val_recalls = eval_epoch(model, val_dataloader, corpus_feature, device, val_gt, corpus_video_list, args.recall_topk)
+                test_recalls = eval_epoch(model, test_dataloader, corpus_feature, device, test_gt, corpus_video_list, args.recall_topk)
+                model.train()
 
-                if val_recall > best_score:
-                    best_score = val_recall
+                # Log each recall value for the given topk values
+                for topk in args.recall_topk:
+                    logger.info(f"VAL  Recall@{topk}: {val_recalls[topk]:.4f}")
+                    logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
+>>>>>>> single_gpu:train.py
+
+                # Use the first topk value as the criterion for best score
+                first_topk = args.recall_topk[0]
+                if val_recalls[first_topk] > best_score:
+                    best_score = val_recalls[first_topk]
                     save_model(args, model, optimizer, suffix="best", logger=logger)
-                    logger.info(f"BEST VAL  Recall@{args.recall_topk}: {val_recall:.4f}")
-                    logger.info(f"BEST TEST Recall@{args.recall_topk}: {test_recall:.4f}")
-        scheduler.step()
+                    logger.info(f"BEST VAL  Recall@{first_topk}: {val_recalls[first_topk]:.4f}")
+                    logger.info(f"BEST TEST Recall@{first_topk}: {test_recalls[first_topk]:.4f}")
 
 if __name__ == "__main__":
     main()

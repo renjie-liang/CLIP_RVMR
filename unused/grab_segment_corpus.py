@@ -1,23 +1,23 @@
 
 import pandas as pd
-from utils.utils import load_json, save_jsonl
+from utils.utils import load_json, save_json
 import json
 import os
 from tqdm import tqdm
 
 # Load video corpus data
-video_corpus_path = "/home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json"
-segment_corpus_path = "data/TVR_Ranking/segment_corpus_1seconds.jsonl"
+video_corpus_path = "/home/share/rjliang/TVR_Ranking/video_corpus.json"
+segment_corpus_path = "data/TVR_Ranking/segment_corpus_4seconds.json"
 video_dir  = "/home/share/rjliang/Dataset/TVR/frames"
 
 video_corpus = load_json(video_corpus_path)
 segment_corpus = []
 # Define segment duration
-segment_second = 1  # seconds
+segment_second = 4  # seconds
 fps = 3 
 
 # Process each video in the video corpus
-for video_name, (duration, _) in tqdm(video_corpus.items()):
+for video_name, duration in tqdm(video_corpus.items()):
     # Calculate the number of segments
     num_segments = int(duration // segment_second) + (1 if duration % segment_second > 0 else 0)
     frame_path = os.path.join(video_dir, video_name)
@@ -46,5 +46,5 @@ for video_name, (duration, _) in tqdm(video_corpus.items()):
         segment_corpus.append(segment)
 
 # Save the segment corpus
-save_jsonl(segment_corpus, segment_corpus_path)
+save_json(segment_corpus, segment_corpus_path)
 print(f"Segment corpus saved to {segment_corpus_path}")

@@ -8,7 +8,7 @@ python main_video_retrieval.py \
     --data_name query_video_clip \
     --experiment_remark  constractive_loss_sim_mask \
     --recall_topk 100 \
-    --batch_size 64  --batch_size_val 64 \
+    --batch_size 64   \
     --learning_rate 1e-4 --lr_step_size 5 --lr_gamma 0.1\
     --step_log=100 --step_eval=1000000 \
     --max_words 32 --max_frame_count 12 \

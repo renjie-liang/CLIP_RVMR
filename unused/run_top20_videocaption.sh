@@ -8,7 +8,7 @@ python main_video_retrieval.py \
     --corpus_path /home/renjie.liang/11_TVR-Ranking/ReLoCLNet/data/TVR_Ranking_v3/video_corpus.json \
     --output_dir result/tvrr_video_videocaption_top20 \
     --experiment_remark  top20 \
-    --batch_size 16  --batch_size_val 16 --lr 1e-4 \
+    --batch_size 16 --lr 1e-4 \
     --step_log=200 --step_eval=1000 \
     --max_words 64 --max_frame_count 64 \
     --feature_framerate 1 --coef_lr 1e-3 \
