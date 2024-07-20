@@ -138,6 +138,7 @@ class EvalVideoDataset(BaseDataset):
     def __getitem__(self, idx):
         anno = self.annotations[idx]
         text = anno["query"]
+
         return text
     
     def generate_gt(self):
@@ -226,12 +227,15 @@ class EvalSegmentDataset(BaseDataset):
 
     def __getitem__(self, idx):
         anno = self.annotations[idx]
-        text = anno["query"]
-        return text
+        model_inputs = {}
+        model_inputs["query"] = anno["query"]
+        model_inputs["query_id"] = anno["query_id"]
+        return model_inputs
     
     def get_segment_retrieval_gt(self):
-        gt_all = []
+        gt_all = {}
         for record in self.annotations:
+            query_id = record["query_id"]
             gt_per_query = []
             for i in record["relevant_segment"]:
                 video_name = i["video_name"]
@@ -240,23 +244,14 @@ class EvalSegmentDataset(BaseDataset):
                 segment_name = video_name + "_" + str(segment_idx)
                 if relevance >= 1:
                     gt_per_query.append(segment_name)
-                    
-            if len(gt_per_query) == 0:
-                i = record["relevant_segment"][0]
-                video_name = i["video_name"]
-                segment_idx = i["segment_idx"]
-                segment_name = video_name + "_" + str(segment_idx)
-                gt_per_query.append(segment_name)
-            gt_all.append(gt_per_query)
+            gt_all[query_id] = gt_per_query
         return gt_all
 
 
     def get_relevant_moment_gt(self):
-        gt_all = []
+        gt_all = {}
         for record in self.annotations:
-            gt_all.append({
-                "query_id": record["query_id"],
-                "relevant_moment": record["relevant_moment"]})
+            gt_all[record["query_id"]] =  record["relevant_moment"]
         return gt_all
     
     

@@ -22,7 +22,7 @@ Todo:
 
 opt = get_args()
 opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-opt.batch_size_eval = 32
+opt.batch_size_eval = 128
 opt.num_workers = 4
 opt.val_coarse_path     = "./data/coarse_prediction.json"
 opt.val_path            = "/home/share/rjliang/TVR_Ranking/val.json"
@@ -62,7 +62,8 @@ for batch in tqdm(coarse_pred_loader, desc="Fine Predict", total=len(coarse_pred
     st_prob = st_prob * batch_input["video_mask"]
     ed_prob = ed_prob * batch_input["video_mask"]
 
-    fine_pred_batch = find_max_triples(st_prob, ed_prob, top_n=1)
+    fine_pred_batch = find_max_triples(st_prob.detach().cpu(), ed_prob.detach().cpu(), top_n=1)
+    # fine_pred_batch = find_max_triples(st_prob.detach().cpu().numpy(), ed_prob, top_n=1)
     for query_id, video_name, preds in zip(meta_data["query_id"], meta_data["video_name"], fine_pred_batch):
         for p in preds:
             start, end, model_scores  = p

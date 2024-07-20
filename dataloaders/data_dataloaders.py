@@ -50,11 +50,14 @@ def collate_fn(processor, batch, task='train'):
         return video_inputs['pixel_values'], video_masks, segment_names
     
     elif task == 'eval':
-        texts = batch
-        text_inputs = processor(text=list(texts), return_tensors="pt", padding=True, truncation=True, max_length=77)
-        return text_inputs['input_ids'], text_inputs['attention_mask']
-
-
+        meta_data, batch_data = {},  {}
+        texts =  [b["query"] for b in batch]
+        text_inputs = processor(text=texts, return_tensors="pt", padding=True, truncation=True, max_length=77)
+        batch_data["text_token_id"] = text_inputs['input_ids']
+        batch_data["text_mask"] = text_inputs['attention_mask']
+        meta_data["query_id"] = [b["query_id"] for b in batch]
+        return meta_data, batch_data
+         
 
 
 

@@ -9,7 +9,7 @@ from utils.setup import get_args, set_seed_logger
 from utils.utils import LossTracker, TimeTracker, save_json
 
 from dataloaders.data_dataloaders import prepare_dataloader_segment
-from modules.evaluate_lib import eval_epoch, grab_corpus_feature
+from modules.evaluate_lib import eval_epoch, grab_corpus_feature, grab_corpus_feature_from_file
 # from modules.modeling import CLIP4Clip
 import time
 from transformers import CLIPProcessor, CLIPModel
@@ -36,7 +36,7 @@ def main():
         device = torch.device("cpu")
         model.to(device)
 
-    train_dataloader, corpus_dataloader, corpus_video_list, val_dataset, val_dataloader, test_dataset, test_dataloader  = prepare_dataloader_segment(args, processor)
+    train_dataloader, corpus_dataloader, corpus_list, val_dataset, val_dataloader, test_dataset, test_dataloader  = prepare_dataloader_segment(args, processor)
 
 
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -46,20 +46,17 @@ def main():
         model, optimizer  = load_model(model, args.checkpoint_path, optimizer,  args.optimizer_path)
         logger.info(f"Load model from {args.checkpoint_path}")
         logger.info(f"Load optimizer from {args.optimizer_path}")
-
     
     model.eval()
+    # corpus_feature = grab_corpus_feature_from_file(vfeat_path="./data/features/segments_clip.h5", max_vlen=4, corpus_list=corpus_list)
     corpus_feature = grab_corpus_feature(model, corpus_dataloader, device) # len(vidoes) * L * 512 
-    val_recalls = eval_epoch(model, val_dataset, val_dataloader, corpus_feature, device, corpus_video_list, args.recall_topk, "val")
-    # test_recalls = eval_epoch(model, test_dataset, test_dataloader, corpus_feature, device, corpus_video_list, args.recall_topk, "test")
-
+    val_recalls = eval_epoch(model, val_dataset, val_dataloader, corpus_feature, device, corpus_list, args.recall_topk, "val")
+    test_recalls = eval_epoch(model, test_dataset, test_dataloader, corpus_feature, device, corpus_list, args.recall_topk, "test")
 
     # Log each recall value for the given topk values
     for topk in args.recall_topk:
         logger.info(f"VAL  Recall@{topk}: {val_recalls[topk]:.4f}")
-        # logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
-
-
+        logger.info(f"TEST Recall@{topk}: {test_recalls[topk]:.4f}\n")
 
 if __name__ == "__main__":
     main()
