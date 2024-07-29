@@ -2,6 +2,7 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 from collections import defaultdict
+import copy
 
 def calculate_iou(pred_start: float, pred_end: float, gt_start: float, gt_end: float) -> float:
     intersection_start = max(pred_start, gt_start)
@@ -34,7 +35,7 @@ def calculate_ndcg_iou(all_gt, all_pred, TS, KS):
         one_gt.sort(key=lambda x: x["relevance"], reverse=True)
 
         for T in TS:
-            one_gt_drop = one_gt.copy()
+            one_gt_drop = copy.deepcopy(one_gt)
             predictions_with_scores = []
             
             for pred in one_pred:
@@ -45,6 +46,13 @@ def calculate_ndcg_iou(all_gt, all_pred, TS, KS):
                 else:
                     ious = [calculate_iou(pred_time[0], pred_time[1], gt["timestamp"][0], gt["timestamp"][1]) for gt in matched_rows]
                     max_iou_idx = np.argmax(ious)
+                    """
+                    # Here we assume there are multiple maximum iou values in some cases.
+                    max_iou = np.max(ious)
+                    # find all max value indices
+                    max_iou_idx = np.where(array == max_iou)[0]
+                    # Select the one with highest rank.
+                    """
                     max_iou_row = matched_rows[max_iou_idx]
                     
                     if ious[max_iou_idx] > T:
