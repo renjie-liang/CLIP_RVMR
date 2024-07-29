@@ -45,14 +45,7 @@ def calculate_ndcg_iou(all_gt, all_pred, TS, KS):
                     pred["pred_relevance"] = 0
                 else:
                     ious = [calculate_iou(pred_time[0], pred_time[1], gt["timestamp"][0], gt["timestamp"][1]) for gt in matched_rows]
-                    max_iou_idx = np.argmax(ious)
-                    """
-                    # Here we assume there are multiple maximum iou values in some cases.
-                    max_iou = np.max(ious)
-                    # find all max value indices
-                    max_iou_idx = np.where(array == max_iou)[0]
-                    # Select the one with highest rank.
-                    """
+                    max_iou_idx = np.argmax(ious) # This function only returns the first index of largest values. However, they are already sorted by relevance, so the most relevant segment is returned.
                     max_iou_row = matched_rows[max_iou_idx]
                     
                     if ious[max_iou_idx] > T:
